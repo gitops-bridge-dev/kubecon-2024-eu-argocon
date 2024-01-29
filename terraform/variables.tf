@@ -22,10 +22,15 @@ variable "addons" {
   description = "Kubernetes addons"
   type        = any
   default = {
-    enable_aws_load_balancer_controller = true
-    enable_aws_ebs_csi_resources        = true # generate gp2 and gp3 storage classes for ebs-csi
-    enable_karpenter                    = true
+    # DevOps
     enable_argo_workflows               = true
+    # Node Autoscalers
+    enable_karpenter                    = true
+    enable_cluster_autoscaler           = true
+
+    # For ArgoCD web ui
+    enable_aws_load_balancer_controller = true
+
   }
 }
 # Addons Git
