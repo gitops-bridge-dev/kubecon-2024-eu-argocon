@@ -39,6 +39,8 @@ locals {
   vpc_cidr = var.vpc_cidr
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
+  git_private_ssh_key = var.ssh_key_path # Update with the git ssh key to be used by ArgoCD
+
   gitops_addons_org      = var.gitops_addons_org
   gitops_addons_url      = "${var.gitops_addons_org}/${var.gitops_addons_repo}"
   gitops_addons_basepath = var.gitops_addons_basepath
