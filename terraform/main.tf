@@ -294,6 +294,23 @@ module "eks" {
     },
   ]
 
+  eks_managed_node_groups = {
+    tenant_a = {
+      instance_types = ["t3.medium"] # 2CPU, 4GB
+
+      min_size     = 1
+      max_size     = 3
+      desired_size = 2
+    }
+    tenant_b = {
+      instance_types = ["m5.large"] # 2CPU, 8GB
+
+      min_size     = 1
+      max_size     = 3
+      desired_size = 2
+    }
+  }
+
   fargate_profiles = {
     karpenter = {
       selectors = [
@@ -310,6 +327,12 @@ module "eks" {
       name = "argocd"
       selectors = [
         { namespace = "argocd" }
+      ]
+    }
+    argo_workflows = {
+      name = "argo-workflows"
+      selectors = [
+        { namespace = "argo-workflows" }
       ]
     }
   }
