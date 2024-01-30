@@ -134,7 +134,7 @@ locals {
 
   tags = {
     Blueprint  = local.name
-    GithubRepo = "github.com/gitops-bridge-dev/gitops-bridge"
+    GithubRepo = "github.com/gitops-bridge-dev/kubecon-2023-eu-argocon"
   }
 }
 
@@ -301,6 +301,10 @@ module "eks" {
       min_size     = 1
       max_size     = 3
       desired_size = 2
+      labels = {
+        event = "argocon"
+        tenant  = "a"
+      }
     }
     tenant_b = {
       instance_types = ["m5.large"] # 2CPU, 8GB
@@ -308,7 +312,12 @@ module "eks" {
       min_size     = 1
       max_size     = 3
       desired_size = 2
+      labels = {
+        event = "argocon"
+        tenant  = "b"
+      }
     }
+
   }
 
   fargate_profiles = {
