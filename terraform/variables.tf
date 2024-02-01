@@ -25,7 +25,7 @@ variable "addons" {
     # DevOps
     enable_argo_workflows               = true
     enable_argo_events                  = true
-    enable_argocd                       = false #manage argocd from argocd
+    enable_argocd                       = true #manage argocd from argocd
     # Node Autoscalers
     enable_karpenter                    = true
     enable_cluster_autoscaler           = true
@@ -34,7 +34,7 @@ variable "addons" {
     enable_aws_load_balancer_controller = true
 
     # Extras
-    enable_metrics_server               = true
+    enable_metrics_server               = false
 
   }
 }

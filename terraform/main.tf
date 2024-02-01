@@ -134,7 +134,7 @@ locals {
     controller:
       env:
         - name: ARGOCD_SYNC_WAVE_DELAY
-          value: '120'
+          value: '30'
     configs:
       cm:
         application.resourceTrackingMethod: 'annotation' #use annotation for tracking required for Crossplane
