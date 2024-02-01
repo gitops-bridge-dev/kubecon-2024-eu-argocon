@@ -60,6 +60,8 @@ spec:
         namespace: '{{values.addonChartRepositoryNamespace}}'
         name: '{{name}}'
       syncPolicy:
+        retry:
+          limit: 100
         automated:
           prune: false
         syncOptions:
