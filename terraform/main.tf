@@ -335,8 +335,8 @@ module "eks" {
       max_size     = 3
       desired_size = 2
       labels = {
-        event = "argocon"
-        tenant  = "a"
+        event = "argocon-eu-2024"
+        team  = "team-a"
       }
     }
     tenant_b = {
@@ -346,8 +346,8 @@ module "eks" {
       max_size     = 3
       desired_size = 2
       labels = {
-        event = "argocon"
-        tenant  = "b"
+        event = "argocon-eu-2024"
+        team  = "team-b"
       }
     }
 
