@@ -1,15 +1,17 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: tenant-b
+  name: team-a
 spec: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: inflate
-  namespace: tenant-b
+  namespace: team-a
 spec:
+  nodeSelector:
+    team: team-a
   replicas: 2
   selector:
     matchLabels:
@@ -31,7 +33,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: inflate-pdb
-  namespace: tenant-b
+  namespace: team-a
 spec:
   minAvailable: 2
   selector:
