@@ -3,6 +3,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: addons-aws-cluster-autoscaler
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   syncPolicy:
     preserveResourcesOnDeletion: true
@@ -41,7 +43,7 @@ spec:
                 matchLabels:
                   kubernetes_version: '1.28'
               values:
-                clusterAutoScalerImageTag: v1.28.0
+                clusterAutoScalerImageTag: v1.28.2
           - clusters:
               selector:
                 matchLabels:
