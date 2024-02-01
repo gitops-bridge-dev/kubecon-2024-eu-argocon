@@ -24,12 +24,17 @@ variable "addons" {
   default = {
     # DevOps
     enable_argo_workflows               = true
+    enable_argo_events                  = true
+    enable_argocd                       = false #manage argocd from argocd
     # Node Autoscalers
     enable_karpenter                    = true
     enable_cluster_autoscaler           = true
 
     # For ArgoCD web ui
     enable_aws_load_balancer_controller = true
+
+    # Extras
+    enable_metrics_server               = true
 
   }
 }
@@ -57,7 +62,7 @@ variable "gitops_addons_basepath" {
 variable "gitops_addons_path" {
   description = "Git repository path for addons"
   type        = string
-  default     = "bootstrap/control-plane/addons"
+  default     = "bootstrap"
 }
 
 # Workloads Git
@@ -79,10 +84,10 @@ variable "gitops_workload_revision" {
 variable "gitops_workload_basepath" {
   description = "Git repository base path for workload"
   type        = string
-  default     = ""
+  default     = "gitops/"
 }
 variable "gitops_workload_path" {
   description = "Git repository path for workload"
   type        = string
-  default     = "terraform/k8s"
+  default     = "apps"
 }

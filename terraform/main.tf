@@ -128,9 +128,37 @@ locals {
   )
 
   argocd_apps = {
-    addons    = file("${path.module}/bootstrap/addons.yaml")
-    #workloads = file("${path.module}/bootstrap/workloads.yaml")
+    bootstrap    = file("${path.module}/bootstrap/bootstrap.yaml")
   }
+  argocd_values = <<-EOT
+    controller:
+      env:
+        - name: ARGOCD_SYNC_WAVE_DELAY
+          value: '120'
+    configs:
+      cm:
+        application.resourceTrackingMethod: 'annotation' #use annotation for tracking required for Crossplane
+        resource.exclusions: |
+          - kinds:
+            - ProviderConfigUsage
+            apiGroups:
+            - "*"
+        resource.customizations: |
+          argoproj.io/Application:
+            health.lua: |
+              hs = {}
+              hs.status = "Progressing"
+              hs.message = ""
+              if obj.status ~= nil then
+                if obj.status.health ~= nil then
+                  hs.status = obj.status.health.status
+                  if obj.status.health.message ~= nil then
+                    hs.message = obj.status.health.message
+                  end
+                end
+              end
+              return hs
+    EOT
 
   tags = {
     Blueprint  = local.name
@@ -182,10 +210,15 @@ module "gitops_bridge_bootstrap" {
     addons   = local.addons
   }
   apps = local.argocd_apps
-  argocd     = { create_namespace = false }
+  argocd     = {
+    create_namespace = false
+    // add values as a templated multiline string
+    values = [local.argocd_values]
+  }
   # wait for fargate profile to be done before installing argocd
   # wait for git secrets to be done before installing argocd
   depends_on = [kubernetes_namespace.argocd, kubernetes_secret.git_secrets, module.eks]
+
 
 }
 

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+spec: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inflate
+  namespace: tenant-a
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inflate
+  template:
+    metadata:
+      labels:
+        app: inflate
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: inflate
+          image: public.ecr.aws/eks-distro/kubernetes/pause:3.7
+          resources:
+            requests:
+              cpu: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inflate-pdb
+  namespace: tenant-a
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: inflate
