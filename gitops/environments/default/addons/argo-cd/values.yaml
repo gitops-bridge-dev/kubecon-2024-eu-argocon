@@ -18,10 +18,10 @@ repoServer:
   resources: # Adjust based on your specific use case (required for HPA)
     requests:
       cpu: '100m'
-      memory: '256Mi'
+      memory: '1024Mi'
     limits:
       cpu: '200m'
-      memory: '512Mi'
+      memory: '1024Mi'
   metrics:
     enabled: true
     service:
