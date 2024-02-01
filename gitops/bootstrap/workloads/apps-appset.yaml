@@ -16,7 +16,7 @@ spec:
               repoURL: '{{metadata.annotations.workload_repo_url}}'
               revision: '{{metadata.annotations.workload_repo_revision}}'
               directories:
-                - path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.workload_repo_pathh}}/*'
+                - path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.workload_repo_path}}/*'
 
   template:
     metadata:
