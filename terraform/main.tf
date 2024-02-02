@@ -365,16 +365,10 @@ module "eks" {
         { namespace = "kube-system" }
       ]
     }
-    argocd = {
-      name = "argocd"
+    argo = {
+      name = "argo"
       selectors = [
-        { namespace = "argocd" }
-      ]
-    }
-    argo_workflows = {
-      name = "argo-workflows"
-      selectors = [
-        { namespace = "argo-workflows" }
+        { namespace = "argo*" }
       ]
     }
   }
