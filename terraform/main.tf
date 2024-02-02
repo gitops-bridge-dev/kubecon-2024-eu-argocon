@@ -135,6 +135,10 @@ locals {
       env:
         - name: ARGOCD_SYNC_WAVE_DELAY
           value: '30'
+    dex:
+      enabled: false
+    notifications:
+      enabled: false
     EOT
 
   tags = {
@@ -305,24 +309,26 @@ module "eks" {
   ]
 
   eks_managed_node_groups = {
-    tenant_a = {
+    team-a = {
       instance_types = ["t3.medium"] # 2CPU, 4GB
 
       min_size     = 1
       max_size     = 3
       desired_size = 2
       labels = {
+        type  = "node-group"
         event = "argocon-eu-2024"
         team  = "team-a"
       }
     }
-    tenant_b = {
+    team-b = {
       instance_types = ["m5.large"] # 2CPU, 8GB
 
       min_size     = 1
       max_size     = 3
       desired_size = 2
       labels = {
+        type  = "node-group"
         event = "argocon-eu-2024"
         team  = "team-b"
       }
