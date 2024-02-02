@@ -16,7 +16,7 @@ spec:
                 matchLabels:
                   argocd.argoproj.io/secret-type: cluster
           - git:
-              repoURL: 'git@github.com:gitops-bridge-dev/kubecon-2023-eu-argocon'
+              repoURL: '{{metadata.annotations.workload_repo_url}}'
               revision: 'main'
               directories:
                 - path: 'gitops/apps/*'
