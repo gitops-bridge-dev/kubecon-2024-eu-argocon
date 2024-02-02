@@ -10,8 +10,6 @@ metadata:
   name: inflate
   namespace: team-a
 spec:
-  nodeSelector:
-    team: team-a
   replicas: 2
   selector:
     matchLabels:
@@ -21,13 +19,15 @@ spec:
       labels:
         app: inflate
     spec:
+      nodeSelector:
+        team: team-a
       terminationGracePeriodSeconds: 0
       containers:
         - name: inflate
           image: public.ecr.aws/eks-distro/kubernetes/pause:3.7
           resources:
             requests:
-              cpu: 1
+              cpu: '1'
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
