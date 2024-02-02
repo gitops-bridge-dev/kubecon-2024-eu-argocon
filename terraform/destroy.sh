@@ -12,7 +12,7 @@ terraform -chdir=$SCRIPTDIR output -raw configure_kubectl > "$TMPFILE"
 # check if TMPFILE contains the string "No outputs found"
 if [[ ! $(cat $TMPFILE) == *"No outputs found"* ]]; then
   source "$TMPFILE"
-  kubectl delete -n argocd applicationset workloads
+  kubectl delete -n argocd applicationset apps
   kubectl delete -n argocd applicationset cluster-addons
   kubectl delete -n argocd applicationset addons-argocd
   kubectl delete -n argocd svc argo-cd-argocd-server

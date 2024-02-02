@@ -1,3 +1,11 @@
+dex:
+  # -- Enable dex
+  enabled: false
+
+notifications:
+  # -- Enable notifications controller
+  enabled: false
+
 controller:
   replicas: 1 # Additional replicas will cause sharding of managed clusters across number of replicas.
   metrics:
