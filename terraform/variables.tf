@@ -47,7 +47,7 @@ variable "gitops_addons_org" {
 variable "gitops_addons_repo" {
   description = "Git repository contains for addons"
   type        = string
-  default     = "kubecon-2023-eu-argocon"
+  default     = "kubecon-2024-eu-argocon"
 }
 variable "gitops_addons_revision" {
   description = "Git repository revision/branch/ref for addons"
@@ -74,7 +74,7 @@ variable "gitops_workload_org" {
 variable "gitops_workload_repo" {
   description = "Git repository contains for workload"
   type        = string
-  default     = "kubecon-2023-eu-argocon"
+  default     = "kubecon-2024-eu-argocon"
 }
 variable "gitops_workload_revision" {
   description = "Git repository revision/branch/ref for workload"
