@@ -11,12 +11,20 @@ spec:
   generators:
     - matrix:
         generators:
-          - clusters: {}
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
           - git:
-              repoURL: '{{metadata.annotations.workload_repo_url}}'
-              revision: '{{metadata.annotations.workload_repo_revision}}'
+              repoURL: 'git@github.com:gitops-bridge-dev/kubecon-2023-eu-argocon'
+              revision: 'main'
               directories:
-                - path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.workload_repo_path}}/*'
+                - path: 'gitops/apps/*'
+          # - git:
+          #     repoURL: '{{metadata.annotations.workload_repo_url}}'
+          #     revision: '{{metadata.annotations.workload_repo_revision}}'
+          #     directories:
+          #       - path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.workload_repo_path}}/*'
 
   template:
     metadata:
