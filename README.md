@@ -3,23 +3,24 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 
 
 
-## Workflows
-### Move workload from nodegroup to karpenter nodes
+# Workflows
+
+## Move workload from nodegroup to karpenter nodes (mode=karpenter)
 1. Take as input the nodegroup name `team-a-12345`
 1. Check if there is corresponding karpenter nodeclass and nodepoll with name of nodegroup
 1. If no karpenter resource present then generate karnpenter nodeclass and nodepool, otherwise skip
-  - `genkarpenter.py <nodegroup>`
-1. Apply karpenter resources via apply or gitops (ie. ArgoCD) if generated file, otherwise skip
-  - `kuebctl apply -f <file>`
-1. Cordon all nodes from nodegroup to avoid pods evicted landing on another node from the nodegroup
-  - `kubectl cordon -l eks.amazonaws.com/nodegroup=team-a-12345`
-1. Add taint "NoSchedule:migratebackfrom:karpenter" to nodegroup (no need to cordon this has same effect)
-1. Drain nodegroup
-1. Scale to zero as optional, set desire and min to 0 (zero) for the nodegroup
+    - `genkarpenter.py <nodegroup>`
+    - Apply karpenter resources via apply or gitops (ie. ArgoCD) if generated file, otherwise skip
+    - `kuebctl apply -f <file>`
+1. Add taint `NoExecute:migratedto:karpenter` to nodegroup. This will evict all pods, and not allow pods into it unless can tolerate the tain.
+1. Set Desired size and Minimum size to 0 (zero) for the nodegroup, then cluster-autoscaler will scale to zero the nodegroup
 
+## Move worklaods from karpenter to nodegroups (mode=nodegroup)
+1. Take as input the nodegroup name `team-a-12345`
+1. Check if there is a karpenter nodepool with nodegroup name, otherwise stop
+1. Update nodegroup taints and asg values
+    - Remove taint "NoExecute:migratedfrom:karpenter" from nodegroup
+    - Scale from zero, set Desired size and Minimum size original values use the annotations from karpenter pool
+1. Wait for nodegroup status active, and desire of nodes running
+1. Remove nodepool with nodegroup name to cordon, drain, and delete all pods
 
-
-
-1. Drain all nodes from nodegroup this starts eviction off the pods
-1. New pods will go Pending, and karpenter wo
-1. Wait for all nodes to be drained
