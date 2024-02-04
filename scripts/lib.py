@@ -43,6 +43,8 @@ def get_karpenter_node_class(client, cluster, nodegroup):
   node_group_tags = get_node_group_tags(client, cluster, nodegroup)
   tags = {**karpenter_tags, **node_group_tags}
   karpenter_ami_family = get_node_group_ami_family(client, cluster, nodegroup)
+  iam_role_arn = get_node_group_iam_node_role(client, cluster, nodegroup)
+  iam_role_name = iam_role_arn.split("/")[-1]
 
   return {
             "apiVersion": "karpenter.k8s.aws/v1beta1",
@@ -52,7 +54,7 @@ def get_karpenter_node_class(client, cluster, nodegroup):
             },
             "spec": {
                 "amiFamily": get_karpenter_ami_type(karpenter_ami_family),
-                "role": get_node_group_iam_node_role(client, cluster, nodegroup),
+                "role": iam_role_name,
                 "subnetSelectorTerms": subnets_map,
                 "securityGroupSelectorTerms":[
                     { "tags": { "karpenter.sh/discovery": cluster } }
@@ -75,7 +77,11 @@ def get_karpenter_node_pool(client, cluster, nodegroup):
   # examples of ami_family string: "AL2_x86_64", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64"
   karpenter_arch = "arm64" if "ARM_64" in ami_family else "amd64"
   instance_types = get_node_group_instance_types(client, cluster, nodegroup)
-  labels = get_node_group_labels(client, cluster, nodegroup)
+  new_labels = {
+     "karpenter.io/nodegroup": nodegroup
+     }
+  nodegroup_labels = get_node_group_labels(client, cluster, nodegroup)
+  labels = {**nodegroup_labels, **new_labels}
   return {
     "apiVersion": "karpenter.sh/v1beta1",
     "kind": "NodePool",

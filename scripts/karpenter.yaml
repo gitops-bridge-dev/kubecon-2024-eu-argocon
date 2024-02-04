@@ -5,7 +5,7 @@ metadata:
   name: team-a-20240203045439786800000003
 spec:
   amiFamily: AL2
-  role: arn:aws:iam::015299085168:role/team-a-eks-node-group-20240202055634320200000005
+  role: team-a-eks-node-group-20240202055634320200000005
   securityGroupSelectorTerms:
   - tags:
       karpenter.sh/discovery: karpenter
@@ -34,6 +34,7 @@ spec:
     metadata:
       labels:
         event: argocon-eu-2024
+        karpenter.io/nodegroup: team-a-20240203045439786800000003
         team: team-a
         type: node-group
     spec:
@@ -64,7 +65,7 @@ metadata:
   name: team-b-20240203045439786700000001
 spec:
   amiFamily: AL2
-  role: arn:aws:iam::015299085168:role/team-b-eks-node-group-20240202055634322500000006
+  role: team-b-eks-node-group-20240202055634322500000006
   securityGroupSelectorTerms:
   - tags:
       karpenter.sh/discovery: karpenter
@@ -93,6 +94,7 @@ spec:
     metadata:
       labels:
         event: argocon-eu-2024
+        karpenter.io/nodegroup: team-b-20240203045439786700000001
         team: team-b
         type: node-group
     spec:

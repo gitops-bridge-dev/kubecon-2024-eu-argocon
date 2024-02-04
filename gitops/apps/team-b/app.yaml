@@ -35,7 +35,7 @@ metadata:
   name: inflate-pdb
   namespace: team-b
 spec:
-  minAvailable: 2
+  minAvailable: 1
   selector:
     matchLabels:
       app: inflate
