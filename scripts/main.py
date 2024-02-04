@@ -3,6 +3,7 @@
 Generate Karpenter from Node Groups
 
 """
+from __future__ import print_function
 import sys
 import boto3
 from botocore.exceptions import ClientError
@@ -25,30 +26,38 @@ def main(profile, region):
   # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html
 
   session = boto3.Session(profile_name=profile)
-  client = session.client('eks', region_name=region)
+  eks = session.client('eks', region_name=region)
   ec2  = session.client('ec2', region_name=region)
 
-
   # Get the node groups
-  for cluster in get_eks_clusters(client):
-    for nodegroup in get_eks_cluster_nodegroups(client, cluster):
+  for cluster in get_eks_clusters(eks):
+    for nodegroup in get_eks_cluster_nodegroups(eks, cluster):
       # print all the information about the node group
       #print(json.dumps(get_node_group(client, cluster, nodegroup), indent=2, cls=DateTimeEncoder))
       #print(json.dumps(get_security_group_from_nodegroup(client, cluster, nodegroup, ec2), indent=2))
-      #get_node_group_pretty_print(client, cluster, nodegroup)
-      # Generate Karpenter NodeClass
-      karpenter_node_class = get_karpenter_node_class(client, cluster, nodegroup)
-      # pretty print the json.dumps output
+      karpenter_node_class = get_karpenter_node_class(eks, cluster, nodegroup)
       #print(json.dumps(karpenter_node_class, indent=2))
       # print karpenter_node_class in yaml
       print("---")
       print(yaml.dump(karpenter_node_class, default_flow_style=False))
-      karpenter_node_pool = get_karpenter_node_pool(client, cluster, nodegroup)
+      karpenter_node_pool = get_karpenter_node_pool(eks, cluster, nodegroup)
       print("---")
       print(yaml.dump(karpenter_node_pool, default_flow_style=False))
+      # create custom object with the node class
+      apply_or_create_custom_object(karpenter_node_class, "ec2nodeclasses")
+      apply_or_create_custom_object(karpenter_node_pool, "nodepools")
+
+
+  # v1 = client.CoreV1Api()
+  # print("Listing pods with their IPs:")
+  # ret = v1.list_pod_for_all_namespaces(watch=False)
+  # for i in ret.items:
+  #     print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+
 
 
   return
+
 
 
 def parse_command_line_option(argv):

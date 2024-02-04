@@ -4,29 +4,46 @@ from botocore.exceptions import ClientError
 import time
 import json
 from datetime import datetime
+import kubernetes.client
+import kubernetes.config as config
+from pprint import pprint
+from kubernetes.client.rest import ApiException
 
+# Configs can be set in Configuration class directly or using helper utility
+config.load_kube_config()
+api = kubernetes.client.CustomObjectsApi()
 
-def get_security_group_from_nodegroup(client, cluster, nodegroup, ec2):
+def apply_or_create_custom_object(object, plural):
   """
-  Get the security group associated with the nodegroup
+  Apply or Create Custom Object
+
   """
   try:
-      response = client.describe_nodegroup(
-          clusterName=cluster,
-          nodegroupName=nodegroup
+    api_response = api.patch_cluster_custom_object(
+      group=object['apiVersion'].split('/')[0],
+      version=object['apiVersion'].split('/')[1],
+      plural=plural,
+      name=object['metadata']['name'],
+      body=object,
+      field_manager="karpenter-migrator"
+    )
+    print("Custom %s object updated.",object['kind']+object['metadata']['name'])
+    pprint(api_response)
+  except kubernetes.client.exceptions.ApiException as e:
+    if e.status == 404:
+      # Custom object doesn't exist, create it
+      api_response = api.create_cluster_custom_object(
+        group=object['apiVersion'].split('/')[0],
+        version=object['apiVersion'].split('/')[1],
+        plural=plural,
+        body=object,
+        pretty='true',
+        field_manager="karpenter-migrator"
       )
-      launch_template_id = response['nodegroup']['launchTemplate']['id']
-      # Describe the Launch Template to get its details
-      launch_template = ec2.describe_launch_templates(LaunchTemplateIds=[launch_template_id])
-      # Extract the security group IDs from the Launch Template
-      return launch_template['LaunchTemplates'][0]['LaunchTemplateData']['SecurityGroupIds']
-  except ClientError as e:
-    print(e)
-    return None
-  return None
-
-
-  return security_group_id
+      print("Custom object created.")
+      pprint(api_response)
+    else:
+      print("Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
 
 
 def get_karpenter_node_class(client, cluster, nodegroup):
@@ -67,7 +84,6 @@ def get_karpenter_node_pool(client, cluster, nodegroup):
   """
   Generate the Karpenter NodePool
   """
-
   capacity_type = get_node_group_capacity_type(client, cluster, nodegroup)
   # if capacity_type is SPOT set karpenter_capacity_type to "spot"
   # if capacity_type is ON_DEMAND set karpenter_capacity_type to "on-demand"
@@ -86,7 +102,12 @@ def get_karpenter_node_pool(client, cluster, nodegroup):
     "apiVersion": "karpenter.sh/v1beta1",
     "kind": "NodePool",
     "metadata": {
-      "name": nodegroup
+      "name": nodegroup,
+      "annotations": {
+        "migrate.karpenter.io/min": str(get_node_group_scaling_min(client, cluster, nodegroup)),
+        "migrate.karpenter.io/max": str(get_node_group_scaling_max(client, cluster, nodegroup)),
+        "migrate.karpenter.io/desired": str(get_node_group_scaling_desiredSize(client, cluster, nodegroup))
+      }
     },
     "spec": {
       "template":{
@@ -114,14 +135,6 @@ def get_karpenter_node_pool(client, cluster, nodegroup):
       }
     }
 }
-
-
-
-
-
-
-
-
 
 
 def get_karpenter_ami_type(ami_type):
@@ -157,85 +170,48 @@ def get_karpenter_ami_type(ami_type):
   else:
     return 'Custom'
 
-def get_node_group_iam_node_role(client, cluster, nodegroup):
-    """
-    Get the node group IAM node role
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['nodeRole']
-    except ClientError as e:
-        print(e)
-        return None
+
+"""
+EKS Managed Node Group Functions
+"""
+
+def get_node_group_attribute(client, cluster, nodegroup, attribute):
+  try:
+    response = client.describe_nodegroup(
+      clusterName=cluster,
+      nodegroupName=nodegroup
+    )
+    return response['nodegroup'][attribute]
+  except ClientError as e:
+    print(e)
     return None
+
+def get_node_group_iam_node_role(client, cluster, nodegroup):
+  return get_node_group_attribute(client, cluster, nodegroup, 'nodeRole')
 
 def get_node_group_subnets(client, cluster, nodegroup):
-    """
-    Get the node group subnets
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['subnets']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
+  return get_node_group_attribute(client, cluster, nodegroup, 'subnets')
 
+# and so on for each method
 def get_node_group_capacity_type(client, cluster, nodegroup):
-    """
-    Get the node group capacity type
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['capacityType']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
-
+  return get_node_group_attribute(client, cluster, nodegroup, 'capacityType')
+def get_node_group_ami_family(client, cluster, nodegroup):
+    return get_node_group_attribute(client, cluster, nodegroup, 'amiType')
+def get_node_group_tags(client, cluster, nodegroup):
+    return get_node_group_attribute(client, cluster, nodegroup, 'tags')
 def get_node_group_scaling(client, cluster, nodegroup):
-    """
-    Get the node group scaling
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['scalingConfig']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+    return get_node_group_attribute(client, cluster, nodegroup, 'scalingConfig')
+def get_node_group_scaling_min(client, cluster, nodegroup):
+    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
+    return scaling_config['minSize']
+def get_node_group_scaling_max(client, cluster, nodegroup):
+    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
+    return scaling_config['maxSize']
+def get_node_group_scaling_desiredSize(client, cluster, nodegroup):
+    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
+    return scaling_config['desiredSize']
 def get_node_group_labels(client, cluster, nodegroup):
-    """
-    Get the node group labels
-    'labels': {
-            'string': 'string'
-        },
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['labels']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+    return get_node_group_attribute(client, cluster, nodegroup, 'labels')
 def get_node_group_taints(client, cluster, nodegroup):
     """
     Get the node group taints
@@ -263,125 +239,31 @@ def get_node_group_taints(client, cluster, nodegroup):
     return None
 
 def get_node_group_instance_types(client, cluster, nodegroup):
-    """
-    Get the node group instance types
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['instanceTypes']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+  return get_node_group_attribute(client, cluster, nodegroup, 'instanceTypes')
 def get_node_group_tags(client, cluster, nodegroup):
-    """
-    Get the node group tags
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['tags']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
+   return get_node_group_attribute(client, cluster, nodegroup, 'tags')
 
 def get_node_group_status(client, cluster, nodegroup):
     """
     Get the node group status
     'status': 'CREATING'|'ACTIVE'|'UPDATING'|'DELETING'|'CREATE_FAILED'|'DELETE_FAILED'|'DEGRADED',
     """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['status']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+    return get_node_group_attribute(client, cluster, nodegroup, 'status')
 def get_node_group_creation_time(client, cluster, nodegroup):
-    """
-    Get the node group creation time
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['createdAt']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+   return get_node_group_attribute(client, cluster, nodegroup, 'createdAt')
 def get_node_group_ami_family(client, cluster, nodegroup):
     """
     Get the node group AMI type
     'amiType': 'AL2_x86_64'|'AL2_x86_64_GPU'|'AL2_ARM_64'|'CUSTOM'|'BOTTLEROCKET_ARM_64'|'BOTTLEROCKET_x86_64'|'BOTTLEROCKET_ARM_64_NVIDIA'|'BOTTLEROCKET_x86_64_NVIDIA'|'WINDOWS_CORE_2019_x86_64'|'WINDOWS_FULL_2019_x86_64'|'WINDOWS_CORE_2022_x86_64'|'WINDOWS_FULL_2022_x86_64',
     """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']['amiType']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
-
+    return get_node_group_attribute(client, cluster, nodegroup, 'amiType')
 def get_node_group(client, cluster, nodegroup):
-    """
-    Get the node group print
-    """
-    try:
-        response = client.describe_nodegroup(
-            clusterName=cluster,
-            nodegroupName=nodegroup
-        )
-        return response['nodegroup']
-    except ClientError as e:
-        print(e)
-        return None
-    return None
+   return get_node_group_attribute(client, cluster, nodegroup, 'nodegroup')
 
 
-
-def get_node_group_pretty_print(client, cluster, nodegroup):
-    """
-    Get the node group pretty print
-    """
-    print("---")
-    print("Cluster: "+cluster)
-    print("Node Group: "+nodegroup)
-    print("Node Group AMI Type: "+get_node_group_ami_family(client, cluster, nodegroup))
-    print("Node Group IAM Node Role: "+get_node_group_iam_node_role(client, cluster, nodegroup))
-    subnets = get_node_group_subnets(client, cluster, nodegroup)
-    print("Node Group Subnets: " + json.dumps(subnets))
-    scaling = get_node_group_scaling(client, cluster, nodegroup)
-    print("Node Group Scaling: " + json.dumps(scaling))
-    labels = get_node_group_labels(client, cluster, nodegroup)
-    print("Node Group Labels: " + json.dumps(labels))
-    tainst = get_node_group_taints(client, cluster, nodegroup)
-    print("Node Group Taints: "+ json.dumps(tainst))
-    instance_types = get_node_group_instance_types(client, cluster, nodegroup)
-    print("Node Group Instance Types: "+ json.dumps(instance_types))
-    tags = get_node_group_tags(client, cluster, nodegroup)
-    print("Node Group Tags: "+ json.dumps(tags))
-    print("Node Group Status: "+get_node_group_status(client, cluster, nodegroup))
-
-    return None
-
-
+"""
+EKS Functions
+"""
 
 def get_eks_clusters(client):
   """
@@ -409,7 +291,6 @@ def delete_eks_cluster_nodegroups(client, cluster):
   """
   Delete EKS Cluster NodeGroups
   """
-
   try:
     response = client.list_nodegroups(clusterName=cluster)['nodegroups']
   except ClientError as e:
@@ -424,7 +305,6 @@ def delete_eks_cluster_nodegroup(client, cluster, node_group):
   """
   Delete EKS Cluster NodeGroups
   """
-
   try:
     print("Deleting nodegroup="+node_group+", In cluster="+cluster)
     result = client.delete_nodegroup(clusterName=cluster, nodegroupName=node_group)
