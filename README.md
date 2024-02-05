@@ -22,7 +22,7 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 1. Remove nodepool with nodegroup name to cordon, drain, and delete all pods
 
 ### TODO:
-In Terraform:
+### Terraform:
 Change the name of the cluster from `karpenter` to `kubecon-cluster`
 Need to disable karpenter role creation
 karpenter_node.create_iam_role = false
@@ -33,3 +33,5 @@ karpenter_node ={
     iam_role_arn = "*"
 }
 ```
+### Python
+migrate from karpenter to nodegroup
