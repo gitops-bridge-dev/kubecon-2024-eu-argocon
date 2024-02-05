@@ -40,6 +40,23 @@ def karpenter_mode(cluster, eks):
     k8s_karpenter_node_pool = apply_or_create_custom_object(karpenter_node_pool, "NodePool")
     # pprint(k8s_karpenter_node_pool)
 
+    # add taint to node group, to remove all pods and not allow more pods to land on node group
+    add_taint_to_nodegroup(eks, cluster, nodegroup_name, {
+        'addOrUpdateTaints': [
+            {
+                'key': 'migratedfrom',
+                'value': 'karpenter',
+                'effect': 'NO_EXECUTE'
+            },
+        ]
+    })
+    # set the scaling config for the node group, min = 0, desired = 0
+    set_scaling_config_for_nodegroup(eks, cluster, nodegroup_name, {
+        'desiredSize': 0,
+        'minSize': 0
+    })
+
+
   return None
 
 

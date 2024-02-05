@@ -281,6 +281,46 @@ def get_karpenter_ami_type(ami_type):
 EKS Functions
 """
 
+def set_scaling_config_for_nodegroup(client, cluster, nodegroup, scaling_config):
+    """
+    Method to set the scaling config for the node group
+    """
+    try:
+        response = client.update_nodegroup_config(
+            clusterName=cluster,
+            nodegroupName=nodegroup,
+            scalingConfig=scaling_config
+        )
+        # wait for the node group to update
+        waiter = client.get_waiter('nodegroup_active')
+        waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
+        print("Scaling config set for node group %s" % nodegroup)
+
+        return response
+    except ClientError as e:
+        print(e)
+        return None
+
+
+def add_taint_to_nodegroup(client, cluster, nodegroup, taints):
+    """
+    Method to add the taint to the node group
+    """
+    try:
+        response = client.update_nodegroup_config(
+            clusterName=cluster,
+            nodegroupName=nodegroup,
+            taints=taints
+        )
+        # wait for the node group to update
+        waiter = client.get_waiter('nodegroup_active')
+        waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
+        print("Taint added to node group %s" % nodegroup)
+
+        return response
+    except ClientError as e:
+        print(e)
+        return None
 
 def get_eks_cluster_nodegroups(client, cluster):
     """
