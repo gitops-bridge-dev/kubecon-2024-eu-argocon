@@ -13,368 +13,295 @@ from kubernetes.client.rest import ApiException
 config.load_kube_config()
 api = kubernetes.client.CustomObjectsApi()
 
-def apply_or_create_custom_object(object, plural):
-  """
-  Apply or Create Custom Object
 
-  """
-  try:
-    api_response = api.patch_cluster_custom_object(
-      group=object['apiVersion'].split('/')[0],
-      version=object['apiVersion'].split('/')[1],
-      plural=plural,
-      name=object['metadata']['name'],
-      body=object,
-      field_manager="karpenter-migrator"
-    )
-    print("Custom %s object updated.",object['kind']+object['metadata']['name'])
-    pprint(api_response)
-  except kubernetes.client.exceptions.ApiException as e:
-    if e.status == 404:
-      # Custom object doesn't exist, create it
-      api_response = api.create_cluster_custom_object(
-        group=object['apiVersion'].split('/')[0],
-        version=object['apiVersion'].split('/')[1],
-        plural=plural,
-        body=object,
-        pretty='true',
-        field_manager="karpenter-migrator"
-      )
-      print("Custom object created.")
-      pprint(api_response)
-    else:
-      print("Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
+def get_karpenter_node_class(nodegroup):
+    """
+    Generate the Karpenter NodeClass
+    """
+    cluster = get_node_group_cluster_name(nodegroup)
+    nodegroup_name = get_node_group_name(nodegroup)
+    subnets = get_node_group_subnets(nodegroup)
+    subnets_map = [{"id": subnet} for subnet in subnets]
+    karpenter_tags = {"karpenter.sh/discovery": cluster}
+    node_group_tags = get_node_group_tags(nodegroup)
+    tags = {**karpenter_tags, **node_group_tags}
+    karpenter_ami_family = get_node_group_ami_family(nodegroup)
+    iam_role_arn = get_node_group_iam_node_role(nodegroup)
+    iam_role_name = iam_role_arn.split("/")[-1]
+    ami_type = get_karpenter_ami_type(karpenter_ami_family)
 
-
-def get_karpenter_node_class(client, cluster, nodegroup):
-  """
-  Generate the Karpenter NodeClass
-  """
-  subnets = get_node_group_subnets(client, cluster, nodegroup)
-  # iterate over the array of the subnets each element is a string
-  # create a new array of map id: subnet
-  subnets_map = [{"id": subnet} for subnet in subnets]
-  karpenter_tags = {
-                "karpenter.sh/discovery": cluster
-            }
-  node_group_tags = get_node_group_tags(client, cluster, nodegroup)
-  tags = {**karpenter_tags, **node_group_tags}
-  karpenter_ami_family = get_node_group_ami_family(client, cluster, nodegroup)
-  iam_role_arn = get_node_group_iam_node_role(client, cluster, nodegroup)
-  iam_role_name = iam_role_arn.split("/")[-1]
-
-  return {
-            "apiVersion": "karpenter.k8s.aws/v1beta1",
-            "kind": "EC2NodeClass",
-            "metadata": {
-                "name": nodegroup
-            },
-            "spec": {
-                "amiFamily": get_karpenter_ami_type(karpenter_ami_family),
-                "role": iam_role_name,
-                "subnetSelectorTerms": subnets_map,
-                "securityGroupSelectorTerms":[
-                    { "tags": { "karpenter.sh/discovery": cluster } }
-                ],
-                "tags": tags
-            }
-  }
-
-def get_karpenter_node_pool(client, cluster, nodegroup):
-  """
-  Generate the Karpenter NodePool
-  """
-  capacity_type = get_node_group_capacity_type(client, cluster, nodegroup)
-  # if capacity_type is SPOT set karpenter_capacity_type to "spot"
-  # if capacity_type is ON_DEMAND set karpenter_capacity_type to "on-demand"
-  karpenter_capacity_type = "on-demand" if capacity_type == "ON_DEMAND" else "spot"
-  ami_family = get_node_group_ami_family(client, cluster, nodegroup)
-  # if ami_family string contains ARM_64 set karpenter_arch to "arm64" else "amd64"
-  # examples of ami_family string: "AL2_x86_64", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64"
-  karpenter_arch = "arm64" if "ARM_64" in ami_family else "amd64"
-  instance_types = get_node_group_instance_types(client, cluster, nodegroup)
-  new_labels = {
-     "karpenter.io/nodegroup": nodegroup
-     }
-  nodegroup_labels = get_node_group_labels(client, cluster, nodegroup)
-  labels = {**nodegroup_labels, **new_labels}
-  return {
-    "apiVersion": "karpenter.sh/v1beta1",
-    "kind": "NodePool",
-    "metadata": {
-      "name": nodegroup,
-      "annotations": {
-        "migrate.karpenter.io/min": str(get_node_group_scaling_min(client, cluster, nodegroup)),
-        "migrate.karpenter.io/max": str(get_node_group_scaling_max(client, cluster, nodegroup)),
-        "migrate.karpenter.io/desired": str(get_node_group_scaling_desiredSize(client, cluster, nodegroup))
-      }
-    },
-    "spec": {
-      "template":{
+    return {
+        "apiVersion": "karpenter.k8s.aws/v1beta1",
+        "kind": "EC2NodeClass",
         "metadata": {
-          "labels": labels
+            "name": nodegroup_name
         },
         "spec": {
-          "nodeClassRef": {
-            "name": nodegroup
-          },
-          "requirements": [
-            { "key": "karpenter.sh/capacity-type"             , "operator": "In", "values": [karpenter_capacity_type] },
-            { "key": "karpenter.io/arch"                      , "operator": "In", "values": [karpenter_arch] },
-            { "key": "karpenter.k8s.aws/instance-hypervisor"  , "operator": "In", "values": ["nitro"] },
-            { "key": "node.kubernetes.io/instance-type"       , "operator": "In", "values": instance_types },
-          ]
+            "amiFamily": ami_type,
+            "role": iam_role_name,
+            "subnetSelectorTerms": subnets_map,
+            "securityGroupSelectorTerms": [
+                {"tags": {"karpenter.sh/discovery": cluster}}
+            ],
+            "tags": tags
         }
-      },
-      "limits": {
-          "cpu": 1000
-      },
-      "disruption":{
-        "consolidationPolicy": "WhenEmpty",
-        "consolidateAfter": "30s"
-      }
     }
-}
 
 
-def get_karpenter_ami_type(ami_type):
-  """
-  Converts an input ami_type to karpenter_ami_type
-  Input ami_type is one of this possible string values: AL2_x86_64,AL2_x86_64_GPU,AL2_ARM_64,CUSTOM,BOTTLEROCKET_ARM_64,BOTTLEROCKET_x86_64,BOTTLEROCKET_ARM_64_NVIDIA,BOTTLEROCKET_x86_64_NVIDIA,WINDOWS_CORE_2019_x86_64,WINDOWS_FULL_2019_x86_64,WINDOWS_CORE_2022_x86_64,WINDOWS_FULL_2022_x86_64
-  Output karpenter_ami_type is one of this possible string values: AL2, Bottlerocket, Ubuntu, Windows2019, Windows2022 or Custom is there is no match
-  """
-  if ami_type == 'AL2_x86_64':
-    return 'AL2'
-  elif ami_type == 'AL2_x86_64_GPU':
-    return 'AL2'
-  elif ami_type == 'AL2_ARM_64':
-    return 'AL2'
-  elif ami_type == 'CUSTOM':
-    return 'Custom'
-  elif ami_type == 'BOTTLEROCKET_ARM_64':
-    return 'Bottlerocket'
-  elif ami_type == 'BOTTLEROCKET_x86_64':
-    return 'Bottlerocket'
-  elif ami_type == 'BOTTLEROCKET_ARM_64_NVIDIA':
-    return 'Bottlerocket'
-  elif ami_type == 'BOTTLEROCKET_x86_64_NVIDIA':
-    return 'Bottlerocket'
-  elif ami_type == 'WINDOWS_CORE_2019_x86_64':
-    return 'Windows2019'
-  elif ami_type == 'WINDOWS_FULL_2019_x86_64':
-    return 'Windows2019'
-  elif ami_type == 'WINDOWS_CORE_2022_x86_64':
-    return 'Windows2022'
-  elif ami_type == 'WINDOWS_FULL_2022_x86_64':
-    return 'Windows2022'
-  else:
-    return 'Custom'
+def get_karpenter_node_pool(nodegroup):
+    """
+    Generate the Karpenter NodePool
+    """
+    nodegroup_name = get_node_group_name(nodegroup)
+    capacity_type = get_node_group_capacity_type(nodegroup)
+    # if capacity_type is SPOT set karpenter_capacity_type to "spot"
+    # if capacity_type is ON_DEMAND set karpenter_capacity_type to "on-demand"
+    karpenter_capacity_type = "on-demand" if capacity_type == "ON_DEMAND" else "spot"
+    ami_family = get_node_group_ami_family(nodegroup)
+    # if ami_family string contains ARM_64 set karpenter_arch to "arm64" else "amd64"
+    # examples of ami_family string: "AL2_x86_64", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64"
+    karpenter_arch = "arm64" if "ARM_64" in ami_family else "amd64"
+    instance_types = get_node_group_instance_types(nodegroup)
+    new_labels = {"karpenter.io/nodegroup": nodegroup_name}
+    nodegroup_labels = get_node_group_labels(nodegroup)
+    labels = {**nodegroup_labels, **new_labels}
+    min = str(get_node_group_scaling_min(nodegroup))
+    max = str(get_node_group_scaling_max(nodegroup))
+    desired_size = str(get_node_group_scaling_desired_size(nodegroup))
+    instance_hypervisor = "nitro"
+    return {
+        "apiVersion": "karpenter.sh/v1beta1",
+        "kind": "NodePool",
+        "metadata": {
+            "name": nodegroup_name,
+            "annotations": {
+                "migrate.karpenter.io/min": min,
+                "migrate.karpenter.io/max": max,
+                "migrate.karpenter.io/desired": desired_size
+            }
+        },
+        "spec": {
+            "template": {
+                "metadata": {
+                    "labels": labels
+                },
+                "spec": {
+                    "nodeClassRef": {
+                        "name": nodegroup_name
+                    },
+                    "requirements": [
+                        {"key": "karpenter.sh/capacity-type", "operator": "In",
+                         "values": [karpenter_capacity_type]},
+                        {"key": "karpenter.io/arch", "operator": "In",
+                         "values": [karpenter_arch]},
+                        {"key": "karpenter.k8s.aws/instance-hypervisor",
+                         "operator": "In", "values": [instance_hypervisor]},
+                        {"key": "node.kubernetes.io/instance-type",
+                         "operator": "In", "values": instance_types},
+                    ]
+                }
+            },
+            "limits": {
+                "cpu": 1000
+            },
+            "disruption": {
+                "consolidationPolicy": "WhenEmpty",
+                "consolidateAfter": "30s"
+            }
+        }
+    }
+
+
+def apply_or_create_custom_object(object, kind):
+    """
+    Apply or Create Custom Object
+
+    """
+    # if kind is EC2NodeClass, plural is ec2nodeclasses
+    # if kind is NodePool, plural is nodepools
+    # else return None
+    if kind not in ["EC2NodeClass", "NodePool"]:
+        print("Kind %s not supported.", kind)
+        return None
+    plural = "ec2nodeclasses" if kind == "EC2NodeClass" else "nodepools"
+    try:
+        api_response = api.patch_cluster_custom_object(
+            group=object['apiVersion'].split('/')[0],
+            version=object['apiVersion'].split('/')[1],
+            plural=plural,
+            name=object['metadata']['name'],
+            body=object,
+            field_manager="karpenter-migrator"
+        )
+        print("%s %s updated." % (kind, object['kind']+object['metadata']['name']))
+        return api_response
+    except kubernetes.client.exceptions.ApiException as e:
+        if e.status == 404:
+            # Custom object doesn't exist, create it
+            api_response = api.create_cluster_custom_object(
+                group=object['apiVersion'].split('/')[0],
+                version=object['apiVersion'].split('/')[1],
+                plural=plural,
+                body=object,
+                pretty='true',
+                field_manager="karpenter-migrator"
+            )
+            print("%s %s created." % (kind, object['kind']+object['metadata']['name']))
+            return api_response
+        else:
+            print(
+                "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
 
 
 """
 EKS Managed Node Group Functions
 """
 
-def get_node_group_attribute(client, cluster, nodegroup, attribute):
-  try:
-    response = client.describe_nodegroup(
-      clusterName=cluster,
-      nodegroupName=nodegroup
-    )
-    return response['nodegroup'][attribute]
-  except ClientError as e:
-    print(e)
-    return None
 
-def get_node_group_iam_node_role(client, cluster, nodegroup):
-  return get_node_group_attribute(client, cluster, nodegroup, 'nodeRole')
-
-def get_node_group_subnets(client, cluster, nodegroup):
-  return get_node_group_attribute(client, cluster, nodegroup, 'subnets')
-
-# and so on for each method
-def get_node_group_capacity_type(client, cluster, nodegroup):
-  return get_node_group_attribute(client, cluster, nodegroup, 'capacityType')
-def get_node_group_ami_family(client, cluster, nodegroup):
-    return get_node_group_attribute(client, cluster, nodegroup, 'amiType')
-def get_node_group_tags(client, cluster, nodegroup):
-    return get_node_group_attribute(client, cluster, nodegroup, 'tags')
-def get_node_group_scaling(client, cluster, nodegroup):
-    return get_node_group_attribute(client, cluster, nodegroup, 'scalingConfig')
-def get_node_group_scaling_min(client, cluster, nodegroup):
-    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
-    return scaling_config['minSize']
-def get_node_group_scaling_max(client, cluster, nodegroup):
-    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
-    return scaling_config['maxSize']
-def get_node_group_scaling_desiredSize(client, cluster, nodegroup):
-    scaling_config = get_node_group_scaling(client, cluster, nodegroup)
-    return scaling_config['desiredSize']
-def get_node_group_labels(client, cluster, nodegroup):
-    return get_node_group_attribute(client, cluster, nodegroup, 'labels')
-def get_node_group_taints(client, cluster, nodegroup):
-    """
-    Get the node group taints
-    'taints': [
-            {
-                'key': 'string',
-                'value': 'string',
-                'effect': 'NO_SCHEDULE'|'NO_EXECUTE'|'PREFER_NO_SCHEDULE'
-            },
-    ]
-    """
+def get_node_group(client, cluster, nodegroup):
     try:
         response = client.describe_nodegroup(
             clusterName=cluster,
             nodegroupName=nodegroup
         )
-        # check if dict response['nodegroup'] contains key taints, if present return it if not present return empty array
-        if 'taints' in response['nodegroup']:
-            return response['nodegroup']['taints']
-        else:
-            return []
+        return response['nodegroup']
     except ClientError as e:
         print(e)
         return None
-    return None
 
-def get_node_group_instance_types(client, cluster, nodegroup):
-  return get_node_group_attribute(client, cluster, nodegroup, 'instanceTypes')
-def get_node_group_tags(client, cluster, nodegroup):
-   return get_node_group_attribute(client, cluster, nodegroup, 'tags')
 
-def get_node_group_status(client, cluster, nodegroup):
+def get_node_group_name(nodegroup):
+    return nodegroup['nodegroupName']
+
+
+def get_node_group_cluster_name(nodegroup):
+    return nodegroup['clusterName']
+
+
+def get_node_group_iam_node_role(nodegroup):
+    return nodegroup['nodeRole']
+
+
+def get_node_group_subnets(nodegroup):
+    return nodegroup['subnets']
+
+
+def get_node_group_capacity_type(nodegroup):
+    return nodegroup['capacityType']
+
+
+def get_node_group_ami_family(nodegroup):
+    return nodegroup['amiType']
+
+
+def get_node_group_tags(nodegroup):
+    return nodegroup['tags']
+
+
+def get_node_group_scaling(nodegroup):
+    return nodegroup['scalingConfig']
+
+
+def get_node_group_scaling_min(nodegroup):
+    return nodegroup['scalingConfig']['minSize']
+
+
+def get_node_group_scaling_max(nodegroup):
+    return nodegroup['scalingConfig']['maxSize']
+
+
+def get_node_group_scaling_desired_size(nodegroup):
+    return nodegroup['scalingConfig']['desiredSize']
+
+
+def get_node_group_labels(nodegroup):
+    labels = nodegroup.get('labels')
+    if labels:
+        return labels
+    else:
+        return []
+
+
+def get_node_group_taints(nodegroup):
+    taints = nodegroup.get('taints')
+    if taints:
+        return taints
+    else:
+        return []
+
+
+def get_node_group_instance_types(nodegroup):
+    return nodegroup['instanceTypes']
+
+
+def get_node_group_tags(nodegroup):
+    return nodegroup['tags']
+
+
+def get_node_group_status(nodegroup):
     """
     Get the node group status
     'status': 'CREATING'|'ACTIVE'|'UPDATING'|'DELETING'|'CREATE_FAILED'|'DELETE_FAILED'|'DEGRADED',
     """
-    return get_node_group_attribute(client, cluster, nodegroup, 'status')
-def get_node_group_creation_time(client, cluster, nodegroup):
-   return get_node_group_attribute(client, cluster, nodegroup, 'createdAt')
-def get_node_group_ami_family(client, cluster, nodegroup):
+    return nodegroup['status']
+
+
+def get_node_group_creation_time(nodegroup):
+    return nodegroup['createdAt']
+
+
+def get_node_group_ami_family(nodegroup):
     """
     Get the node group AMI type
     'amiType': 'AL2_x86_64'|'AL2_x86_64_GPU'|'AL2_ARM_64'|'CUSTOM'|'BOTTLEROCKET_ARM_64'|'BOTTLEROCKET_x86_64'|'BOTTLEROCKET_ARM_64_NVIDIA'|'BOTTLEROCKET_x86_64_NVIDIA'|'WINDOWS_CORE_2019_x86_64'|'WINDOWS_FULL_2019_x86_64'|'WINDOWS_CORE_2022_x86_64'|'WINDOWS_FULL_2022_x86_64',
     """
-    return get_node_group_attribute(client, cluster, nodegroup, 'amiType')
-def get_node_group(client, cluster, nodegroup):
-   return get_node_group_attribute(client, cluster, nodegroup, 'nodegroup')
+    return nodegroup['amiType']
+
+
+def get_karpenter_ami_type(ami_type):
+    ami_type_map = {
+        "AL2_x86_64": "AL2",
+        "AL2_x86_64_GPU": "AL2",
+        "AL2_ARM_64": "AL2",
+        "CUSTOM": "Custom",
+        "BOTTLEROCKET_ARM_64": "Bottlerocket",
+        "BOTTLEROCKET_x86_64": "Bottlerocket",
+        "BOTTLEROCKET_ARM_64_NVIDIA": "Bottlerocket",
+        "BOTTLEROCKET_x86_64_NVIDIA": "Bottlerocket",
+        "WINDOWS_CORE_2019_x86_64": "Windows2019",
+        "WINDOWS_FULL_2019_x86_64": "Windows2019",
+        "WINDOWS_CORE_2022_x86_64": "Windows2022",
+        "WINDOWS_FULL_2022_x86_64": "Windows2022"
+    }
+    karpenter_ami_type = ami_type_map.get(ami_type, "Custom")
+    return karpenter_ami_type
 
 
 """
 EKS Functions
 """
 
-def get_eks_clusters(client):
-  """
-  Return all EKS Clusters
-  """
-  try:
-    response = client.list_clusters()['clusters']
-  except ClientError as e:
-    print(e.response['Error']['Message'])
-
-  return response
 
 def get_eks_cluster_nodegroups(client, cluster):
-  """
-  Return all EKS Cluster NodeGroups
-  """
-  try:
-    response = client.list_nodegroups(clusterName=cluster)['nodegroups']
-  except ClientError as e:
-    print(e.response['Error']['Message'])
-
-  return response
-
-def delete_eks_cluster_nodegroups(client, cluster):
-  """
-  Delete EKS Cluster NodeGroups
-  """
-  try:
-    response = client.list_nodegroups(clusterName=cluster)['nodegroups']
-  except ClientError as e:
-    print(e.response['Error']['Message'])
-
-  for node_group in response:
-    delete_eks_cluster_nodegroup(client, cluster, node_group)
-
-  return
-
-def delete_eks_cluster_nodegroup(client, cluster, node_group):
-  """
-  Delete EKS Cluster NodeGroups
-  """
-  try:
-    print("Deleting nodegroup="+node_group+", In cluster="+cluster)
-    result = client.delete_nodegroup(clusterName=cluster, nodegroupName=node_group)
-  except ClientError as e:
-    print(e.response['Error']['Message'])
-
-  return
-
-def wait_node_group_deleted(client, cluster, node_group):
-  """
-  Wait for node group to be deleted
-  """
-  while (True):
-    try:
-      response = client.describe_nodegroup(clusterName=cluster,nodegroupName=node_group)['nodegroup']
-    except ClientError as e:
-      print("Node group deleted")
-      break
-    else:
-      print("Node group still exists")
-      time.sleep( 30 )
-
-  return
-
-# Delete all eks cluster for specific region
-def delete_eks_clusters(client):
-  """
-  Delete all EKS Clusters
-  """
-  # get all clusters to delete
-  clusters = client.list_clusters()['clusters']
-  for c in clusters:
-    delete_eks_cluster(client, c)
-
-  return
-
-def delete_eks_cluster(client, cluster):
     """
-    Delete EKS Cluster
+    Return all EKS Cluster NodeGroups
     """
     try:
-      print("Deleting cluster="+cluster)
-      result = client.delete_cluster(name=cluster)
+        response = client.list_nodegroups(clusterName=cluster)['nodegroups']
     except ClientError as e:
-      print(e.response['Error']['Message'])
+        print(e.response['Error']['Message'])
 
-    return
-
-
-def wait_cluster_deleted(client, cluster):
-    """
-    Wait for cluster to be deleted
-    """
-    while (True):
-      try:
-        response = client.describe_cluster(name=cluster)['cluster']
-      except ClientError as e:
-        print("Cluster deleted")
-        break
-      else:
-        print("Cluster still exists")
-        time.sleep( 30 )
-
-    return
+    return response
 
 
+"""
+Utils Functions
+"""
 # Custom JSON encoder to serialize datetime objects
+
+
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
             return o.isoformat()
         return super().default(o)
-
