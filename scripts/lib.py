@@ -1,32 +1,27 @@
-import sys
-import boto3
 from botocore.exceptions import ClientError
-import time
 import json
 from datetime import datetime
 import kubernetes.client
 import kubernetes.config as config
-from pprint import pprint
-from kubernetes.client.rest import ApiException
 
 # Configs can be set in Configuration class directly or using helper utility
 config.load_kube_config()
 api = kubernetes.client.CustomObjectsApi()
 
 
-def get_karpenter_node_class(nodegroup):
+def generate_karpenter_node_class(nodegroup):
     """
     Generate the Karpenter NodeClass
     """
-    cluster = get_node_group_cluster_name(nodegroup)
-    nodegroup_name = get_node_group_name(nodegroup)
-    subnets = get_node_group_subnets(nodegroup)
+    cluster = nodegroup['clusterName']
+    nodegroup_name = nodegroup['nodegroupName']
+    subnets = nodegroup['subnets']
     subnets_map = [{"id": subnet} for subnet in subnets]
     karpenter_tags = {"karpenter.sh/discovery": cluster}
-    node_group_tags = get_node_group_tags(nodegroup)
+    node_group_tags = nodegroup['tags']
     tags = {**karpenter_tags, **node_group_tags}
-    karpenter_ami_family = get_node_group_ami_family(nodegroup)
-    iam_role_arn = get_node_group_iam_node_role(nodegroup)
+    karpenter_ami_family = nodegroup['amiType']
+    iam_role_arn = nodegroup['nodeRole']
     iam_role_name = iam_role_arn.split("/")[-1]
     ami_type = get_karpenter_ami_type(karpenter_ami_family)
 
@@ -48,26 +43,26 @@ def get_karpenter_node_class(nodegroup):
     }
 
 
-def get_karpenter_node_pool(nodegroup):
+def generate_karpenter_node_pool(nodegroup):
     """
     Generate the Karpenter NodePool
     """
-    nodegroup_name = get_node_group_name(nodegroup)
-    capacity_type = get_node_group_capacity_type(nodegroup)
+    nodegroup_name = nodegroup['nodegroupName']
+    capacity_type = nodegroup['capacityType']
     # if capacity_type is SPOT set karpenter_capacity_type to "spot"
     # if capacity_type is ON_DEMAND set karpenter_capacity_type to "on-demand"
     karpenter_capacity_type = "on-demand" if capacity_type == "ON_DEMAND" else "spot"
-    ami_family = get_node_group_ami_family(nodegroup)
+    ami_family = nodegroup['amiType']
     # if ami_family string contains ARM_64 set karpenter_arch to "arm64" else "amd64"
     # examples of ami_family string: "AL2_x86_64", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64"
     karpenter_arch = "arm64" if "ARM_64" in ami_family else "amd64"
-    instance_types = get_node_group_instance_types(nodegroup)
+    instance_types = nodegroup['instanceTypes']
     new_labels = {"karpenter.io/nodegroup": nodegroup_name}
-    nodegroup_labels = get_node_group_labels(nodegroup)
+    nodegroup_labels = nodegroup.get('labels') or []
     labels = {**nodegroup_labels, **new_labels}
-    min = str(get_node_group_scaling_min(nodegroup))
-    max = str(get_node_group_scaling_max(nodegroup))
-    desired_size = str(get_node_group_scaling_desired_size(nodegroup))
+    min = str(nodegroup['scalingConfig']['minSize'])
+    max = str(nodegroup['scalingConfig']['maxSize'])
+    desired_size = str(nodegroup['scalingConfig']['desiredSize'])
     instance_hypervisor = "nitro"
     return {
         "apiVersion": "karpenter.sh/v1beta1",
@@ -133,7 +128,8 @@ def apply_or_create_custom_object(object, kind):
             body=object,
             field_manager="karpenter-migrator"
         )
-        print("%s %s updated." % (kind, object['kind']+object['metadata']['name']))
+        print("%s %s updated." %
+              (kind, object['kind']+object['metadata']['name']))
         return api_response
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
@@ -146,12 +142,12 @@ def apply_or_create_custom_object(object, kind):
                 pretty='true',
                 field_manager="karpenter-migrator"
             )
-            print("%s %s created." % (kind, object['kind']+object['metadata']['name']))
+            print("%s %s created." %
+                  (kind, object['kind']+object['metadata']['name']))
             return api_response
         else:
             print(
                 "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
-
 
 
 def get_custom_object(object_name, kind):
@@ -166,14 +162,48 @@ def get_custom_object(object_name, kind):
         print("Kind %s not supported.", kind)
         return None
     plural = "ec2nodeclasses" if kind == "EC2NodeClass" else "nodepools"
+    # if plural is ec2nodeclasses then set group to 'karpenter.k8s.aws' other wise karpenter.sh
+    group = "karpenter.k8s.aws" if plural == "ec2nodeclasses" else "karpenter.sh"
     try:
         api_response = api.get_cluster_custom_object(
-            group='karpenter.k8s.aws',
+            group=group,
             version='v1beta1',
             plural=plural,
             name=object_name,
         )
-        print("Found %s %s " % (kind, object['kind']+object_name))
+        return api_response
+    except kubernetes.client.exceptions.ApiException as e:
+        if e.status == 404:
+            # Custom object doesn't exist
+            print("%s %s not found" % (kind, object_name))
+            return None
+        else:
+            print(
+                "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
+
+
+def delete_custom_object(object_name, kind):
+    """
+    Apply or Create Custom Object
+
+    """
+    # if kind is EC2NodeClass, plural is ec2nodeclasses
+    # if kind is NodePool, plural is nodepools
+    # else return None
+    if kind not in ["EC2NodeClass", "NodePool"]:
+        print("Kind %s not supported.", kind)
+        return None
+    plural = "ec2nodeclasses" if kind == "EC2NodeClass" else "nodepools"
+    # if plural is ec2nodeclasses then set group to 'karpenter.k8s.aws' other wise karpenter.sh
+    group = "karpenter.k8s.aws" if plural == "ec2nodeclasses" else "karpenter.sh"
+    try:
+        api_response = api.delete_cluster_custom_object(
+            group=group,
+            version='v1beta1',
+            plural=plural,
+            name=object_name,
+        )
+        print("Deleted %s %s " % (kind, object_name))
         return api_response
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
@@ -202,94 +232,6 @@ def get_node_group(client, cluster, nodegroup):
         return None
 
 
-def get_node_group_name(nodegroup):
-    return nodegroup['nodegroupName']
-
-
-def get_node_group_cluster_name(nodegroup):
-    return nodegroup['clusterName']
-
-
-def get_node_group_iam_node_role(nodegroup):
-    return nodegroup['nodeRole']
-
-
-def get_node_group_subnets(nodegroup):
-    return nodegroup['subnets']
-
-
-def get_node_group_capacity_type(nodegroup):
-    return nodegroup['capacityType']
-
-
-def get_node_group_ami_family(nodegroup):
-    return nodegroup['amiType']
-
-
-def get_node_group_tags(nodegroup):
-    return nodegroup['tags']
-
-
-def get_node_group_scaling(nodegroup):
-    return nodegroup['scalingConfig']
-
-
-def get_node_group_scaling_min(nodegroup):
-    return nodegroup['scalingConfig']['minSize']
-
-
-def get_node_group_scaling_max(nodegroup):
-    return nodegroup['scalingConfig']['maxSize']
-
-
-def get_node_group_scaling_desired_size(nodegroup):
-    return nodegroup['scalingConfig']['desiredSize']
-
-
-def get_node_group_labels(nodegroup):
-    labels = nodegroup.get('labels')
-    if labels:
-        return labels
-    else:
-        return []
-
-
-def get_node_group_taints(nodegroup):
-    taints = nodegroup.get('taints')
-    if taints:
-        return taints
-    else:
-        return []
-
-
-def get_node_group_instance_types(nodegroup):
-    return nodegroup['instanceTypes']
-
-
-def get_node_group_tags(nodegroup):
-    return nodegroup['tags']
-
-
-def get_node_group_status(nodegroup):
-    """
-    Get the node group status
-    'status': 'CREATING'|'ACTIVE'|'UPDATING'|'DELETING'|'CREATE_FAILED'|'DELETE_FAILED'|'DEGRADED',
-    """
-    return nodegroup['status']
-
-
-def get_node_group_creation_time(nodegroup):
-    return nodegroup['createdAt']
-
-
-def get_node_group_ami_family(nodegroup):
-    """
-    Get the node group AMI type
-    'amiType': 'AL2_x86_64'|'AL2_x86_64_GPU'|'AL2_ARM_64'|'CUSTOM'|'BOTTLEROCKET_ARM_64'|'BOTTLEROCKET_x86_64'|'BOTTLEROCKET_ARM_64_NVIDIA'|'BOTTLEROCKET_x86_64_NVIDIA'|'WINDOWS_CORE_2019_x86_64'|'WINDOWS_FULL_2019_x86_64'|'WINDOWS_CORE_2022_x86_64'|'WINDOWS_FULL_2022_x86_64',
-    """
-    return nodegroup['amiType']
-
-
 def get_karpenter_ami_type(ami_type):
     ami_type_map = {
         "AL2_x86_64": "AL2",
@@ -309,9 +251,27 @@ def get_karpenter_ami_type(ami_type):
     return karpenter_ami_type
 
 
-"""
-EKS Functions
-"""
+def update_nodegroup(client, **kargs):
+    """
+    Method to set the scaling config for the node group
+    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/eks/client/update_nodegroup_config.html
+    """
+    try:
+        response = client.update_nodegroup_config(
+            clusterName=kargs['clusterName'],
+            nodegroupName=kargs['nodegroupName'],
+            taints=kargs['taints'],
+            scalingConfig=kargs['scalingConfig']
+        )
+        # wait for the node group to update
+        waiter = client.get_waiter('nodegroup_active')
+        waiter.wait(clusterName=kargs['clusterName'],
+                    nodegroupName=kargs['nodegroupName'])
+        return response
+    except ClientError as e:
+        print(e)
+        return None
+
 
 def set_scaling_config_for_nodegroup(client, cluster, nodegroup, scaling_config):
     """
@@ -353,6 +313,7 @@ def add_taint_to_nodegroup(client, cluster, nodegroup, taints):
     except ClientError as e:
         print(e)
         return None
+
 
 def remove_taint_to_nodegroup(client, cluster, nodegroup, taints):
     """

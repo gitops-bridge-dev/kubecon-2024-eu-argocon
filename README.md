@@ -5,6 +5,7 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 
 ## Migrate workloads from nodegroup to karpenter (mode=karpenter)
 1. Take as input the nodegroup name `team-a-12345`
+1. Check if nodepool is present with nodegroup name if it is then stop
 1. Generate karpenter nodeclass and nodepool, otherwise skip
     - `genkarpenter.py <nodegroup>`
     - Apply karpenter resources via apply or gitops (ie. ArgoCD) if generated file, otherwise skip
@@ -21,6 +22,38 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 1. Wait for nodegroup status active, and desire of nodes running
 1. Remove nodepool with nodegroup name to cordon, drain, and delete all pods
 1. Remove nodeclass with nodegroup name
+
+
+## Testing/Demo
+### Listing Node from Node Group
+To get all the nodes created by a node group
+```shell
+watch kubectl get nodes -l eks.amazonaws.com/nodegroup
+```
+To get all the nodes created by a node group and used by `team-a`
+```shell
+watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-a
+```
+To get all the nodes created by a node group and used by `team-b`
+```shell
+watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-b
+```
+### Listing Node from Node Group
+To get all the nodes created by a node group
+```shell
+watch kubectl get nodes -l karpenter.sh/nodepool
+```
+To get all the nodes created by a node group and used by `team-a`
+```shell
+watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a
+```
+To get all the nodes created by a node group and used by `team-b`
+```shell
+watch kubectl get nodes -l karpenter.sh/nodepool,team=team-b
+```
+
+
+
 
 ### TODO:
 ### Terraform:
