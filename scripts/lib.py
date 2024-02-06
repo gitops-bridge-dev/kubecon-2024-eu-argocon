@@ -153,6 +153,38 @@ def apply_or_create_custom_object(object, kind):
                 "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
 
 
+
+def get_custom_object(object_name, kind):
+    """
+    Apply or Create Custom Object
+
+    """
+    # if kind is EC2NodeClass, plural is ec2nodeclasses
+    # if kind is NodePool, plural is nodepools
+    # else return None
+    if kind not in ["ECs2NodeClass", "NodePool"]:
+        print("Kind %s not supported.", kind)
+        return None
+    plural = "ec2nodeclasses" if kind == "EC2NodeClass" else "nodepools"
+    try:
+        api_response = api.get_cluster_custom_object(
+            group='karpenter.k8s.aws',
+            version='v1beta1',
+            plural=plural,
+            name=object_name,
+        )
+        print("Found %s %s " % (kind, object['kind']+object_name))
+        return api_response
+    except kubernetes.client.exceptions.ApiException as e:
+        if e.status == 404:
+            # Custom object doesn't exist
+            print("%s %s not found" % (kind, object_name))
+            return None
+        else:
+            print(
+                "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
+
+
 """
 EKS Managed Node Group Functions
 """
@@ -321,6 +353,27 @@ def add_taint_to_nodegroup(client, cluster, nodegroup, taints):
     except ClientError as e:
         print(e)
         return None
+
+def remove_taint_to_nodegroup(client, cluster, nodegroup, taints):
+    """
+    Method to remove the taint to the node group
+    """
+    try:
+        response = client.update_nodegroup_config(
+            clusterName=cluster,
+            nodegroupName=nodegroup,
+            taints=taints
+        )
+        # wait for the node group to update
+        waiter = client.get_waiter('nodegroup_active')
+        waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
+        print("Taint removed to node group %s" % nodegroup)
+
+        return response
+    except ClientError as e:
+        print(e)
+        return None
+
 
 def get_eks_cluster_nodegroups(client, cluster):
     """

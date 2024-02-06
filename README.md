@@ -20,18 +20,45 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
     - Scale from zero, set Desired size and Minimum size original values use the annotations from karpenter pool
 1. Wait for nodegroup status active, and desire of nodes running
 1. Remove nodepool with nodegroup name to cordon, drain, and delete all pods
+1. Remove nodeclass with nodegroup name
 
 ### TODO:
 ### Terraform:
-Change the name of the cluster from `karpenter` to `kubecon-cluster`
-Need to disable karpenter role creation
-karpenter_node.create_iam_role = false
-Set karpenter_node.iam_role_arn to "*"
+- Change the name of the cluster from `karpenter` to `kubecon-cluster`
+- Need to disable karpenter role creation, and allow passRole to any instance profile
+    ```hcp
+    karpenter_node ={
+        create_iam_role = false
+        iam_role_arn = "*"
+    }
+    ```
+### Python:
+- Implement mode=nodegroup migrate from karpenter to nodegroup
+
+### Argo Workflows
+- Create Service Account with permissions for Workflow
+- Write workflow template
+- White argo events listener
+- Run Argo Workflow as Fargate or Node Group
+- Design CRD
+```yaml
+apiVersion: migrator.karpenter.io/v1alpha1
+Kind: KarpenterMigrator
+metadata:
+  name: team-a
+spec:
+  # karpenter or noderoup mode
+  mode: karpenter
+  # tags to find eks cluster
+  clusterSelector:
+    Blueprint: karpenter
+  # tags to find node groups
+  groupSelector:
+    team: team-a
+  # skip nodegroups with this tag
+  skipGroupSelector:
+    migrator.karpenter.io/skip: true
+  # region to target
+  region: us-east-2
 ```
-karpenter_node ={
-    create_iam_role = false
-    iam_role_arn = "*"
-}
-```
-### Python
-migrate from karpenter to nodegroup
+

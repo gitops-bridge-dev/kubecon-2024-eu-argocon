@@ -14,7 +14,7 @@ import yaml
 
 def karpenter_mode(cluster, eks):
   """
-  Do the work..
+  Migrate Node Groups to Karpenter
 
   Order of operation:
 
@@ -61,6 +61,46 @@ def karpenter_mode(cluster, eks):
 
 
 
+def nodegroup_mode(cluster, eks):
+  """
+  Migrate Karpenter back to Node Group
+
+  Order of operation:
+
+  1.) Get Node Groups of EKS Cluster
+  2.) Generate Karpenter NodeClass and NodePool for each Node Group
+  """
+
+  # Get the node groups
+  for nodegroup_name in get_eks_cluster_nodegroups(eks, cluster):
+    # restore the scaling config for the node group using labels from nodepool
+    # TODO hardcode for debug
+    k8s_karpenter_node_pool = get_custom_object(nodegroup_name, "NodePool")
+    min_size = int(k8s_karpenter_node_pool['metadata']['migrate.karpenter.io/min'])
+    print("min_size="+str(min_size))
+    desiredSize = 2
+    # set_scaling_config_for_nodegroup(eks, cluster, nodegroup_name, {
+    #     'desiredSize': desiredSize,
+    #     'minSize': minSize
+    # })
+    # # TODO wait for desiredSize of nodes to be ready
+
+    # # remove taint to node group, to remove all pods and not allow more pods to land on node group
+    # remove_taint_to_nodegroup(eks, cluster, nodegroup_name, {
+    #     'removeTaints': [
+    #         {
+    #             'key': 'migratedfrom',
+    #             'value': 'karpenter',
+    #             'effect': 'NO_EXECUTE'
+    #         },
+    #     ]
+    # })
+    # TODO delete nodepool, then delete nodeclass
+
+
+  return None
+
+
 def parse_command_line_option(argv):
 
   ## DEBUG
@@ -83,8 +123,11 @@ def parse_command_line_option(argv):
   if mode == "karpenter":
     karpenter_mode(cluster_name, eks)
     return None
+  elif mode == "nodegroup":
+    nodegroup_mode(cluster_name, eks)
+    return None
   else:
-    print("Mode nodegroup not implemented yet")
+    print("Mode %s is not supported. Please use karpenter or nodegroup" % mode)
 
 if __name__ == "__main__":
   parse_command_line_option(sys.argv)
