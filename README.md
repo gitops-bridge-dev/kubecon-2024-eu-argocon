@@ -7,11 +7,9 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 1. Take as input the nodegroup name `team-a-12345`
 1. Check if nodepool is present with nodegroup name if it is then stop
 1. Generate karpenter nodeclass and nodepool, otherwise skip
-    - `genkarpenter.py <nodegroup>`
-    - Apply karpenter resources via apply or gitops (ie. ArgoCD) if generated file, otherwise skip
-    - `kuebctl apply -f <file>`
+1. Apply karpenter resources via apply or gitops (ie. ArgoCD)
 1. Add taint `NoExecute:migratedto:karpenter` to nodegroup. This will evict all pods, and not allow pods into it unless can tolerate the taints.
-1. Set Desired size and Minimum size to 0 (zero) for the nodegroup, then cluster-autoscaler will scale to zero the nodegroup
+1. Set Desired size and Minimum size to 0 (zero) for the nodegroup, then cluster-autoscaler will scale to zero the nodegroup. you can scale to zero cluster-autoscaler or uninstall
 
 ## Migrate workloads from karpenter to nodegroups (mode=nodegroup)
 1. Take as input the nodegroup name `team-a-12345`
@@ -66,6 +64,7 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 ### TODO:
 - Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
 ### Terraform:
+- split the worker nodes into different terraform module, this allows to comment out and apply to delete the nodegroups once they are migrated.
 - Change the name of the cluster from `karpenter` to `kubecon-cluster`
 - Need to disable karpenter role creation, and allow passRole to any instance profile
     ```hcl
@@ -74,6 +73,9 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
         iam_role_arn = "*"
     }
     ```
+
+### GitOps
+- Replace name of app inflate to
 
 ### Argo Workflows
 - Write workflow template
