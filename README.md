@@ -38,6 +38,10 @@ To get all the nodes created by a node group and used by `team-b`
 ```shell
 watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-b
 ```
+To get all the nodes created by a node group and used by `team-a` and `team-b`
+```shell
+watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-a -l eks.amazonaws.com/nodegroup,team=team-b
+```
 ### Listing Node from Node Group
 To get all the nodes created by a node group
 ```shell
@@ -51,11 +55,16 @@ To get all the nodes created by a node group and used by `team-b`
 ```shell
 watch kubectl get nodes -l karpenter.sh/nodepool,team=team-b
 ```
+To get all the nodes created by a node group and used by `team-a` and `team-b`
+```shell
+watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nodepool,team=team-b
+```
 
 
 
 
 ### TODO:
+- Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
 ### Terraform:
 - Change the name of the cluster from `karpenter` to `kubecon-cluster`
 - Need to disable karpenter role creation, and allow passRole to any instance profile
@@ -65,8 +74,6 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-b
         iam_role_arn = "*"
     }
     ```
-### Python:
-- Implement mode=nodegroup migrate from karpenter to nodegroup
 
 ### Argo Workflows
 - Create Service Account with permissions for Workflow

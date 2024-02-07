@@ -8,9 +8,10 @@ import sys
 import boto3
 from lib import *
 import yaml
+import json
 
 
-def karpenter_mode(cluster, eks):
+def karpenter_mode(cluster, eks, ec2):
     """
     Migrate from Node Groups to Karpenter
 
@@ -28,7 +29,7 @@ def karpenter_mode(cluster, eks):
         # skip if there is already a corresponding karpenter node pool
         if k8s_karpenter_node_pool is not None:
             continue
-        karpenter_node_class = generate_karpenter_node_class(nodegroup)
+        karpenter_node_class = generate_karpenter_node_class(eks, ec2, nodegroup)
         # print karpenter_node_class in yaml
         print("---")
         print(yaml.dump(karpenter_node_class, default_flow_style=False))
@@ -138,8 +139,9 @@ def parse_command_line_option(argv):
     region = argv[3]
     # print("Cluster="+cluster_name+", Region="+region)
     eks = session.client('eks', region_name=region)
+    ec2 = session.client('ec2', region_name=region)
     if mode == "karpenter":
-        karpenter_mode(cluster_name, eks)
+        karpenter_mode(cluster_name, eks, ec2)
         return None
     elif mode == "nodegroup":
         nodegroup_mode(cluster_name, eks)

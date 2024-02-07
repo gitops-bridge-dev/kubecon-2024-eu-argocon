@@ -9,12 +9,14 @@ config.load_kube_config()
 api = kubernetes.client.CustomObjectsApi()
 
 
-def generate_karpenter_node_class(nodegroup):
+def generate_karpenter_node_class(eks, ec2, nodegroup):
     """
     Generate the Karpenter NodeClass
     """
     cluster = nodegroup['clusterName']
     nodegroup_name = nodegroup['nodegroupName']
+    security_groups = get_nodegroup_sg(eks, ec2, nodegroup)
+    security_groups_map = [{"id": security_group} for security_group in security_groups]
     subnets = nodegroup['subnets']
     subnets_map = [{"id": subnet} for subnet in subnets]
     karpenter_tags = {"karpenter.sh/discovery": cluster}
@@ -35,9 +37,7 @@ def generate_karpenter_node_class(nodegroup):
             "amiFamily": ami_type,
             "role": iam_role_name,
             "subnetSelectorTerms": subnets_map,
-            "securityGroupSelectorTerms": [
-                {"tags": {"karpenter.sh/discovery": cluster}}
-            ],
+            "securityGroupSelectorTerms": security_groups_map,
             "tags": tags
         }
     }
@@ -346,6 +346,42 @@ def get_eks_cluster_nodegroups(client, cluster):
         print(e.response['Error']['Message'])
 
     return response
+
+
+def get_nodegroup_sg(eks, ec2, nodegroup):
+    """
+    Return Security Group for node group
+    """
+    template_name = nodegroup['launchTemplate']['name']
+    template_version = nodegroup['launchTemplate']['version']
+    try:
+        template = ec2.describe_launch_template_versions(
+            LaunchTemplateName=template_name, Versions=[template_version])
+        # check if template[0]['LaunchTemplateData']['NetworkInterfaces'][0]['Groups']
+        # if template[0]['LaunchTemplateData']['NetworkInterfaces'][0]['Groups'] is not None, return it
+        # else check template[0]['LaunchTemplateData']['SecurityGroupIds']]
+        # if template[0]['LaunchTemplateData']['SecurityGroupIds'] is not None, return it
+        launch_template = template.get('LaunchTemplateVersions')
+        if launch_template:
+          launch_data = launch_template[0].get('LaunchTemplateData')
+        if launch_data:
+          sg_top = launch_data.get('SecurityGroupIds')
+          network_interfaces = launch_data.get('NetworkInterfaces')
+          if network_interfaces:
+            sg_net = network_interfaces[0].get('Groups')
+            if sg_net is not None:
+              return sg_net
+            if sg_top is not None:
+              return sg_top
+
+        # return eks security group
+        cluster = eks.describe_cluster(name=nodegroup['clusterName'])
+        return [cluster['cluster']['resourcesVpcConfig']['clusterSecurityGroupId']]
+
+    except ClientError as e:
+        print(e.response['Error']['Message'])
+
+    return None
 
 
 """
