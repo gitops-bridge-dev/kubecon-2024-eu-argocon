@@ -68,7 +68,7 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 ### Terraform:
 - Change the name of the cluster from `karpenter` to `kubecon-cluster`
 - Need to disable karpenter role creation, and allow passRole to any instance profile
-    ```hcp
+    ```hcl
     karpenter_node ={
         create_iam_role = false
         iam_role_arn = "*"
@@ -76,10 +76,8 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
     ```
 
 ### Argo Workflows
-- Create Service Account with permissions for Workflow
 - Write workflow template
 - White argo events listener
-- Run Argo Workflow as Fargate or Node Group
 - Design CRD
 ```yaml
 apiVersion: migrator.karpenter.io/v1alpha1
@@ -95,9 +93,6 @@ spec:
   # tags to find node groups
   groupSelector:
     team: team-a
-  # skip nodegroups with this tag
-  skipGroupSelector:
-    migrator.karpenter.io/skip: true
   # region to target
   region: us-east-2
 ```

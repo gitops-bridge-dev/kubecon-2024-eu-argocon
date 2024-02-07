@@ -19,7 +19,10 @@ def generate_karpenter_node_class(eks, ec2, nodegroup):
     security_groups_map = [{"id": security_group} for security_group in security_groups]
     subnets = nodegroup['subnets']
     subnets_map = [{"id": subnet} for subnet in subnets]
-    karpenter_tags = {"karpenter.sh/discovery": cluster}
+    karpenter_tags = {
+        "karpenter.sh/discovery": cluster,
+        "migrate.karpenter.io/nodegroup": nodegroup_name
+        }
     node_group_tags = nodegroup['tags']
     tags = {**karpenter_tags, **node_group_tags}
     karpenter_ami_family = nodegroup['amiType']
@@ -57,7 +60,7 @@ def generate_karpenter_node_pool(nodegroup):
     # examples of ami_family string: "AL2_x86_64", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64"
     karpenter_arch = "arm64" if "ARM_64" in ami_family else "amd64"
     instance_types = nodegroup['instanceTypes']
-    new_labels = {"karpenter.io/nodegroup": nodegroup_name}
+    new_labels = {"migrate.karpenter.io/nodegroup": nodegroup_name}
     nodegroup_labels = nodegroup.get('labels') or []
     labels = {**nodegroup_labels, **new_labels}
     min = str(nodegroup['scalingConfig']['minSize'])
