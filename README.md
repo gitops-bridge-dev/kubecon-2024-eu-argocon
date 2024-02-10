@@ -22,7 +22,6 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 1. Remove nodeclass with nodegroup name
 
 
-## Testing/Demo
 ### Listing Node from Node Group
 To get all the nodes created by a node group
 ```shell
@@ -66,24 +65,8 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 ### GitOps
 - Replace name of app inflate to app
 ### Terraform:
-- split the worker nodes into different terraform module file, this allows to comment out and apply to delete the nodegroups once they are migrated.
-- Change the name of the cluster from `karpenter` to `kubecon-cluster`
-- Need to disable karpenter role creation, and allow passRole to any instance profile
-    ```hcl
-    karpenter_node ={
-        create_iam_role = false
-        iam_role_arn = "*"
-    }
-    ```
-- when destroying the nodegroups we need to preserve the roles from the nodegroups (or create duplicate ones), and the entries per nodegroup in aws-auth configmap
-example of aws-auth
-```
-    - "groups":
-      - "system:bootstrappers"
-      - "system:nodes"
-      "rolearn": "arn:aws:iam::01234567:role/team-a-eks-node-group-20240202055634320200000005"
-      "username": "system:node:{{EC2PrivateDNSName}}"
-```
+
+
 
 
 

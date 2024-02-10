@@ -20,7 +20,7 @@ spec:
                 path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.annotations.workload_repo_path}}/team'
           - list:
               elements:
-                - team: "1"
+                - team: "team-1"
           - git:
               repoURL: '{{metadata.annotations.workload_repo_url}}'
               revision: '{{metadata.annotations.workload_repo_revision}}'
@@ -29,6 +29,9 @@ spec:
   template:
     metadata:
       name: app-{{team}}
+    finalizers:
+      # The default behaviour is foreground cascading deletion
+      - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
       source:
@@ -36,12 +39,12 @@ spec:
         path: '{{values.path}}'
         targetRevision: '{{metadata.annotations.workload_repo_revision}}'
         helm:
+          releaseName: '{{team}}'
           valueFiles:
-            - values.yaml
             - values-{{team}}.yaml
       destination:
         name: '{{name}}'
-        namespace: team-{{team}}
+        namespace: '{{team}}'
       syncPolicy:
         automated:
           allowEmpty: true
