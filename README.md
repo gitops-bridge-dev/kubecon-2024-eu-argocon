@@ -77,6 +77,13 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
     ```
 - when destroying the nodegroups we need to preserve the roles from the nodegroups (or create duplicate ones), and the entries per nodegroup in aws-auth configmap
 example of aws-auth
+```
+    - "groups":
+      - "system:bootstrappers"
+      - "system:nodes"
+      "rolearn": "arn:aws:iam::01234567:role/team-a-eks-node-group-20240202055634320200000005"
+      "username": "system:node:{{EC2PrivateDNSName}}"
+```
 
 
 
