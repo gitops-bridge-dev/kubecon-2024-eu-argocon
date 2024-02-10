@@ -63,8 +63,10 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 
 ### TODO:
 - Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
+### GitOps
+- Replace name of app inflate to app
 ### Terraform:
-- split the worker nodes into different terraform module, this allows to comment out and apply to delete the nodegroups once they are migrated.
+- split the worker nodes into different terraform module file, this allows to comment out and apply to delete the nodegroups once they are migrated.
 - Change the name of the cluster from `karpenter` to `kubecon-cluster`
 - Need to disable karpenter role creation, and allow passRole to any instance profile
     ```hcl
@@ -73,9 +75,10 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
         iam_role_arn = "*"
     }
     ```
+- when destroying the nodegroups we need to preserve the roles from the nodegroups (or create duplicate ones), and the entries per nodegroup in aws-auth configmap
+example of aws-auth
 
-### GitOps
-- Replace name of app inflate to
+
 
 ### Argo Workflows
 - Write workflow template
