@@ -143,6 +143,9 @@ def translate_nodegroup_taints(taints):
         elif taint['effect'] == 'PREFER_NO_SCHEDULE':
             taint['effect'] = 'PreferNoSchedule'
         taints_translated.append(taint)
+    # remove from the taints_translated an item if the key is "migratedfrom" and value is "karpenter"
+    taints_translated = [taint for taint in taints_translated if taint['key']
+                         != 'migratedfrom' and taint['value'] != 'karpenter']
     return taints_translated
 
 

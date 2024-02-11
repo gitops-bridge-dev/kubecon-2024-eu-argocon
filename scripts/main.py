@@ -122,7 +122,7 @@ def nodegroup_mode(cluster, eks):
         )
         # scale cluster-autoscaler to zero
         scale_deployment(
-            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
+            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
 
         # Delete nodepool and nodeclass
         print("Deleting NodePool"+nodegroup_name)

@@ -62,16 +62,22 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 
 ### TODOs:
 - Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
-### GitOps
+
+**GitOps:**
 - Rename appset relase name to `aws-cluster-autoscaler`
-### Terraform:
+
+**Terraform:**
 - rename appset cluster-addons to bootstrap
 - argocd load balancer using classic and it doesn't work. This is because svc LoadBalancer is created before loadbalancer controller is running.
-  To fix delete `svc` and recreate with argocd sync
-  ```shell
-  kubectl delete svc -n argocd argo-cd-argocd-server
-  argocd app sync addon-in-cluster-argo-cd
-  ```
+    To fix delete `svc` and recreate with argocd sync
+    ```shell
+    kubectl delete svc -n argocd argo-cd-argocd-server
+    argocd app sync addon-in-cluster-argo-cd
+    ```
+    For now use port-forward
+    ```shell
+    kubectl port-forward -n argocd deployments/argo-cd-argocd-server 8080:8080
+    ```
 
 
 

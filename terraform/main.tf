@@ -301,7 +301,7 @@ module "eks" {
   aws_auth_roles = [
     # We need to add node IAM role for nodes launched by Karpenter
     {
-      rolearn  = aws_iam_role.node[0].name
+      rolearn  = aws_iam_role.node[0].arn
       username = "system:node:{{EC2PrivateDNSName}}"
       groups = [
         "system:bootstrappers",
