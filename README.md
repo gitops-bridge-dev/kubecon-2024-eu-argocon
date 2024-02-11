@@ -60,7 +60,7 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 
 
 
-### TODO:
+### TODOs:
 - Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
 ### GitOps
 - Replace name of app inflate to app

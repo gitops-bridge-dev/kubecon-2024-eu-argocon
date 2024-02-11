@@ -3,6 +3,8 @@ provider "aws" {
 }
 data "aws_caller_identity" "current" {}
 data "aws_availability_zones" "available" {}
+data "aws_partition" "current" {}
+
 
 provider "helm" {
   kubernetes {
@@ -31,8 +33,10 @@ provider "kubernetes" {
 }
 
 locals {
-  name   = "karpenter"
+  name   = "argocon-1"
   region = var.region
+  environment = "control-plane"
+  create_node_groups = true
 
   cluster_version = var.kubernetes_version
 
@@ -135,10 +139,7 @@ locals {
       env:
         - name: ARGOCD_SYNC_WAVE_DELAY
           value: '30'
-    dex:
-      enabled: false
-    notifications:
-      enabled: false
+
     EOT
 
   tags = {
@@ -189,6 +190,7 @@ module "gitops_bridge_bootstrap" {
   cluster = {
     metadata = local.addons_metadata
     addons   = local.addons
+    environment = local.environment
   }
   apps = local.argocd_apps
   argocd     = {
@@ -232,6 +234,11 @@ module "eks_blueprints_addons" {
   enable_aws_for_fluentbit            = local.aws_addons.enable_aws_for_fluentbit
   enable_aws_node_termination_handler = local.aws_addons.enable_aws_node_termination_handler
   enable_karpenter                    = local.aws_addons.enable_karpenter
+  # This allows karpenter to passRole any role to instance profile that it creates
+  karpenter_node = {
+        create_iam_role = false
+        iam_role_arn = "*"
+  }
   enable_velero                       = local.aws_addons.enable_velero
   enable_aws_gateway_api_controller   = local.aws_addons.enable_aws_gateway_api_controller
 
@@ -267,11 +274,6 @@ module "eks_blueprints_addons" {
     kube-proxy = {}
   }
 
-  karpenter_node = {
-    # Use static name so that it matches what is defined in `karpenter.yaml` example manifest
-    iam_role_use_name_prefix = false
-  }
-
   tags = local.tags
 }
 
@@ -292,49 +294,21 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
 
   # Fargate profiles use the cluster primary security group so these are not utilized
-  create_cluster_security_group = false
-  create_node_security_group    = false
+  #create_cluster_security_group = false
+  #create_node_security_group    = false
 
   manage_aws_auth_configmap = true
   aws_auth_roles = [
-    # We need to add in the Karpenter node IAM role for nodes launched by Karpenter
+    # We need to add node IAM role for nodes launched by Karpenter
     {
-      rolearn  = module.eks_blueprints_addons.karpenter.node_iam_role_arn
+      rolearn  = aws_iam_role.node[0].name
       username = "system:node:{{EC2PrivateDNSName}}"
       groups = [
         "system:bootstrappers",
         "system:nodes",
       ]
-    },
+    }
   ]
-
-  eks_managed_node_groups = {
-    team-a = {
-      instance_types = ["t3.medium"] # 2CPU, 4GB
-
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-      labels = {
-        type  = "node-group"
-        event = "argocon-eu-2024"
-        team  = "team-a"
-      }
-    }
-    team-b = {
-      instance_types = ["m5.large"] # 2CPU, 8GB
-
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-      labels = {
-        type  = "node-group"
-        event = "argocon-eu-2024"
-        team  = "team-b"
-      }
-    }
-
-  }
 
   fargate_profiles = {
     karpenter = {
@@ -382,6 +356,51 @@ module "eks" {
   })
 }
 
+################################################################################
+# Create Node IAM Roles
+################################################################################
+
+locals {
+  iam_role_name          = "${local.name}-eks-node"
+  iam_role_policy_prefix = "arn:${data.aws_partition.current.partition}:iam::aws:policy"
+}
+
+data "aws_iam_policy_document" "assume_role_policy" {
+  count = 1
+
+  statement {
+    sid     = "EKSNodeAssumeRole"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "node" {
+  count = 1
+
+  name        = local.iam_role_name
+
+  assume_role_policy    = data.aws_iam_policy_document.assume_role_policy[0].json
+  force_detach_policies = true
+
+  tags = local.tags
+}
+
+# Policies attached ref https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_node_group
+resource "aws_iam_role_policy_attachment" "this" {
+  for_each = toset([
+    "${local.iam_role_policy_prefix}/AmazonEKSWorkerNodePolicy",
+    "${local.iam_role_policy_prefix}/AmazonEC2ContainerRegistryReadOnly",
+    "${local.iam_role_policy_prefix}/AmazonEKS_CNI_Policy",
+  ])
+
+  policy_arn = each.value
+  role       = aws_iam_role.node[0].name
+}
 
 ################################################################################
 # Supporting Resources
