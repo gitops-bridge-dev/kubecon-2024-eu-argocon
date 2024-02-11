@@ -1,8 +1,10 @@
 from botocore.exceptions import ClientError
 import json
+import time
 from datetime import datetime
 import kubernetes.client
 import kubernetes.config as config
+
 
 # Configs can be set in Configuration class directly or using helper utility
 config.load_kube_config()
@@ -16,13 +18,14 @@ def generate_karpenter_node_class(eks, ec2, nodegroup):
     cluster = nodegroup['clusterName']
     nodegroup_name = nodegroup['nodegroupName']
     security_groups = get_nodegroup_sg(eks, ec2, nodegroup)
-    security_groups_map = [{"id": security_group} for security_group in security_groups]
+    security_groups_map = [{"id": security_group}
+                           for security_group in security_groups]
     subnets = nodegroup['subnets']
     subnets_map = [{"id": subnet} for subnet in subnets]
     karpenter_tags = {
         "karpenter.sh/discovery": cluster,
         "migrate.karpenter.io/nodegroup": nodegroup_name
-        }
+    }
     node_group_tags = nodegroup['tags']
     tags = {**karpenter_tags, **node_group_tags}
     karpenter_ami_family = nodegroup['amiType']
@@ -63,6 +66,7 @@ def generate_karpenter_node_pool(nodegroup):
     new_labels = {"migrate.karpenter.io/nodegroup": nodegroup_name}
     nodegroup_labels = nodegroup.get('labels') or []
     labels = {**nodegroup_labels, **new_labels}
+    taints = translate_nodegroup_taints(nodegroup['taints'])
     min = str(nodegroup['scalingConfig']['minSize'])
     max = str(nodegroup['scalingConfig']['maxSize'])
     desired_size = str(nodegroup['scalingConfig']['desiredSize'])
@@ -96,7 +100,8 @@ def generate_karpenter_node_pool(nodegroup):
                          "operator": "In", "values": [instance_hypervisor]},
                         {"key": "node.kubernetes.io/instance-type",
                          "operator": "In", "values": instance_types},
-                    ]
+                    ],
+                    "taints": taints
                 }
             },
             "limits": {
@@ -108,6 +113,37 @@ def generate_karpenter_node_pool(nodegroup):
             }
         }
     }
+
+
+def translate_nodegroup_taints(taints):
+    """
+    taints is an array with the following structure for each item dict
+    [
+        {
+            'key': 'string',
+            'value': 'string',
+            'effect': 'NO_SCHEDULE'|'NO_EXECUTE'|'PREFER_NO_SCHEDULE'
+        }
+    ]
+    return the taints with the effect changed to match the following return
+    [
+        {
+            'key': 'string',
+            'value': 'string',
+            'effect': 'NoSchedule'|'NoExecute'|'PreferNoSchedule'
+        }
+    ]
+    """
+    taints_translated = []
+    for taint in taints:
+        if taint['effect'] == 'NO_SCHEDULE':
+            taint['effect'] = 'NoSchedule'
+        elif taint['effect'] == 'NO_EXECUTE':
+            taint['effect'] = 'NoExecute'
+        elif taint['effect'] == 'PREFER_NO_SCHEDULE':
+            taint['effect'] = 'PreferNoSchedule'
+        taints_translated.append(taint)
+    return taints_translated
 
 
 def apply_or_create_custom_object(object, kind):
@@ -216,6 +252,32 @@ def delete_custom_object(object_name, kind):
         else:
             print(
                 "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
+
+# scale deployment cluster-autoscaler-aws-cluster-autoscaler in namespace kube-system to 2 replicas
+
+
+def scale_deployment(deployment_name, namespace, replicas):
+    apps_api = kubernetes.client.AppsV1Api()
+    try:
+        api_response = apps_api.patch_namespaced_deployment_scale(
+            name=deployment_name,
+            namespace=namespace,
+            body={
+                "spec": {
+                    "replicas": replicas
+                }
+            }
+        )
+    except kubernetes.client.exceptions.ApiException as e:
+        if e.status == 404:
+            # Custom object doesn't exist
+            print("deployment %s in %s not found" %
+                  (deployment_name, namespace))
+            return None
+        else:
+            print(
+                "Exception when calling CustomObjectsApi->patch_cluster_custom_object: %s\n" % e)
+    return None
 
 
 """
@@ -366,16 +428,16 @@ def get_nodegroup_sg(eks, ec2, nodegroup):
         # if template[0]['LaunchTemplateData']['SecurityGroupIds'] is not None, return it
         launch_template = template.get('LaunchTemplateVersions')
         if launch_template:
-          launch_data = launch_template[0].get('LaunchTemplateData')
+            launch_data = launch_template[0].get('LaunchTemplateData')
         if launch_data:
-          sg_top = launch_data.get('SecurityGroupIds')
-          network_interfaces = launch_data.get('NetworkInterfaces')
-          if network_interfaces:
-            sg_net = network_interfaces[0].get('Groups')
-            if sg_net is not None:
-              return sg_net
-            if sg_top is not None:
-              return sg_top
+            sg_top = launch_data.get('SecurityGroupIds')
+            network_interfaces = launch_data.get('NetworkInterfaces')
+            if network_interfaces:
+                sg_net = network_interfaces[0].get('Groups')
+                if sg_net is not None:
+                    return sg_net
+                if sg_top is not None:
+                    return sg_top
 
         # return eks security group
         cluster = eks.describe_cluster(name=nodegroup['clusterName'])

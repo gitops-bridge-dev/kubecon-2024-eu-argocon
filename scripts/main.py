@@ -9,6 +9,7 @@ import boto3
 from lib import *
 import yaml
 import json
+from pprint import pprint
 
 
 def karpenter_mode(cluster, eks, ec2):
@@ -29,7 +30,8 @@ def karpenter_mode(cluster, eks, ec2):
         # skip if there is already a corresponding karpenter node pool
         if k8s_karpenter_node_pool is not None:
             continue
-        karpenter_node_class = generate_karpenter_node_class(eks, ec2, nodegroup)
+        karpenter_node_class = generate_karpenter_node_class(
+            eks, ec2, nodegroup)
         # print karpenter_node_class in yaml
         print("---")
         print(yaml.dump(karpenter_node_class, default_flow_style=False))
@@ -40,10 +42,13 @@ def karpenter_mode(cluster, eks, ec2):
         apply_or_create_custom_object(karpenter_node_class, "EC2NodeClass")
         apply_or_create_custom_object(karpenter_node_pool, "NodePool")
 
+        # scale cluster-autoscaler to zero
+        scale_deployment(
+            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
         # evict all pods by placing a NO_EXECUTE taint on the nodes
         # scale down to zero by updating scalingConfig, and set max to 1
         print("Evicting pods from nodegroup " +
-              nodegroup_name+"and scaling to zero")
+              nodegroup_name+" and scaling to zero")
         update_nodegroup(
             eks,
             clusterName=cluster,
@@ -115,6 +120,9 @@ def nodegroup_mode(cluster, eks):
                 'maxSize': max_size
             }
         )
+        # scale cluster-autoscaler to zero
+        scale_deployment(
+            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
 
         # Delete nodepool and nodeclass
         print("Deleting NodePool"+nodegroup_name)
