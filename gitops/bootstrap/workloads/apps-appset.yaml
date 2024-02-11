@@ -21,6 +21,7 @@ spec:
           - list:
               elements:
                 - team: "team-1"
+                - team: "team-2"
   template:
     metadata:
       name: app-{{team}}
