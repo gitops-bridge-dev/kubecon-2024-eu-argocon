@@ -28,7 +28,7 @@ spec:
         path: '{{metadata.annotations.addons_repo_basepath}}platform/argo-workflows'
         targetRevision: '{{metadata.annotations.addons_repo_revision}}'
       destination:
-        namespace: '{{default "argo-workflows" .metadata.annotations.argo_workflows_namespace}}'
+        namespace: 'argo-workflows'
         name: '{{name}}'
       syncPolicy:
         automated: {}
