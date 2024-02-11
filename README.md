@@ -65,7 +65,12 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nod
 ### GitOps
 - Replace name of app inflate to app
 ### Terraform:
-
+argocd load balancer using classic and it doesn't work. This is because svc LoadBalancer is created before loadbalancer controller is running.
+To fix delete `svc` and recreate with argocd sync
+```shell
+kubectl delete svc -n argocd argo-cd-argocd-server
+argocd app sync addon-in-cluster-argo-cd
+```
 
 
 

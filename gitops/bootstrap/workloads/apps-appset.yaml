@@ -21,17 +21,12 @@ spec:
           - list:
               elements:
                 - team: "team-1"
-          - git:
-              repoURL: '{{metadata.annotations.workload_repo_url}}'
-              revision: '{{metadata.annotations.workload_repo_revision}}'
-              directories:
-                - path: '{{metadata.annotations.workload_repo_basepath}}{{metadata.annotations.workload_repo_path}}/*'
   template:
     metadata:
       name: app-{{team}}
-    finalizers:
-      # The default behaviour is foreground cascading deletion
-      - resources-finalizer.argocd.argoproj.io
+      finalizers:
+        # The default behaviour is foreground cascading deletion
+        - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
       source:
