@@ -6,7 +6,7 @@ Generate Karpenter from Node Groups
 from __future__ import print_function
 import sys
 import boto3
-from lib import *
+from infralib import *
 import yaml
 import json
 from pprint import pprint
