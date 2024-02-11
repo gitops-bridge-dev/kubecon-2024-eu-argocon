@@ -118,6 +118,9 @@ locals {
       aws_vpc_id       = module.vpc.vpc_id
     },
     {
+      argo_workflows_iam_role_arn         = module.argo_workflows_irsa_aws.iam_role_arn
+    },
+    {
       addons_repo_url      = local.gitops_addons_url
       addons_repo_basepath = local.gitops_addons_basepath
       addons_repo_path     = local.gitops_addons_path
@@ -431,6 +434,33 @@ module "vpc" {
     "kubernetes.io/role/internal-elb" = 1
     # Tags subnets for Karpenter auto-discovery
     "karpenter.sh/discovery" = local.name
+  }
+
+  tags = local.tags
+}
+################################################################################
+# Argo-Workflows
+################################################################################
+locals {
+  argo_workflows_namespace = "argo-workflows"
+  argo_workflows_sa        = "argo-workflow"
+}
+
+module "argo_workflows_irsa_aws" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.14"
+
+  role_name_prefix = "${local.name}-argo-workflows-"
+
+  role_policy_arns = {
+    policy = "arn:aws:iam::aws:policy/AdministratorAccess"
+  }
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["${local.argo_workflows_namespace}:${local.argo_workflows_sa}"]
+    }
   }
 
   tags = local.tags

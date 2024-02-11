@@ -62,7 +62,7 @@ spec:
               workflow:
                 serviceAccount:
                   annotations:
-                    eks.amazonaws.com/role-arn: test-irsa-role
+                    eks.amazonaws.com/role-arn: {{.metadata.annotations.argo_workflows_iam_role_arn}}
       destination:
         namespace: '{{default "argo-workflows" .metadata.annotations.argo_workflows_namespace}}'
         name: '{{.name}}'
