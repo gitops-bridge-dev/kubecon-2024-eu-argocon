@@ -62,6 +62,15 @@ Get authentication token using argo cli
 ```shell
 argo auth token
 ```
+Smoke test for argo-workflows:
+```shell
+argo submit -n argo-workflows --serviceaccount argo-workflow https://raw.githubusercontent.com/argoproj/argo-workflows/main/examples/hello-world.yaml
+
+argo list -n argo-workflows
+
+argo logs @latest -n argo-workflows
+```
+
 
 
 
