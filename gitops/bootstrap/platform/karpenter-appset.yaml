@@ -1,0 +1,36 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-karpenter
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: akuity.io/argo-cd-cluster-name
+              operator: NotIn
+              values: [in-cluster]
+            - key: enable_karpenter
+              operator: In
+              values: ['true']
+  template:
+    metadata:
+      name: platform-{{name}}-karpenter
+    spec:
+      project: default
+      source:
+        repoURL: '{{metadata.annotations.addons_repo_url}}'
+        path: '{{metadata.annotations.addons_repo_basepath}}platform/karpenter'
+        targetRevision: '{{metadata.annotations.addons_repo_revision}}'
+      destination:
+        name: '{{name}}'
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true  # Big CRDs.

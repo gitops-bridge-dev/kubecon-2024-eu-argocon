@@ -325,7 +325,11 @@ module "eks" {
     argo = {
       name = "argo"
       selectors = [
-        { namespace = "argo*" }
+        { namespace = "argo*",
+          labels = {
+            "app.kubernetes.io/managed-by" = "Helm"
+          }
+        }
       ]
     }
   }

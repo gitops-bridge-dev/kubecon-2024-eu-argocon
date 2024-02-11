@@ -27,34 +27,40 @@ To get all the nodes created by a node group
 ```shell
 watch kubectl get nodes -l eks.amazonaws.com/nodegroup
 ```
-To get all the nodes created by a node group and used by `team-a`
+To get all the nodes created by a node group and used by `team-1`
 ```shell
-watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-a
+watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-1
 ```
-To get all the nodes created by a node group and used by `team-b`
+Use eks-node-viewer for nodegroups
 ```shell
-watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-b
-```
-To get all the nodes created by a node group and used by `team-a` and `team-b`
-```shell
-watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-a -l eks.amazonaws.com/nodegroup,team=team-b
+eks-node-viewer --kubeconfig /tmp/argocon-1 --nodeSelector eks.amazonaws.com/nodegroup  -disable-pricing
 ```
 ### Listing Node from Node Group
 To get all the nodes created by a node group
 ```shell
 watch kubectl get nodes -l karpenter.sh/nodepool
 ```
-To get all the nodes created by a node group and used by `team-a`
+To get all the nodes created by a node group and used by `team-1`
 ```shell
-watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a
+watch kubectl get nodes -l karpenter.sh/nodepool,team=team-1
 ```
-To get all the nodes created by a node group and used by `team-b`
+Use eks-node-viewer for nodegroups
 ```shell
-watch kubectl get nodes -l karpenter.sh/nodepool,team=team-b
+eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector karpenter.sh/nodepool -disable-pricing
 ```
-To get all the nodes created by a node group and used by `team-a` and `team-b`
+
+ArgoCD Port Forward:
 ```shell
-watch kubectl get nodes -l karpenter.sh/nodepool,team=team-a -l karpenter.sh/nodepool,team=team-b
+kubectl port-forward -n argocd deployments/argo-cd-argocd-server 8080:8080
+```
+
+Use the Argo Workflow UI, use port-forward, and open url http://localhost:8081
+```shell
+kubectl port-forward -n argo-workflows svc/argo-workflows-server 8081:2746
+```
+Get authentication token using argo cli
+```shell
+argo auth token
 ```
 
 
