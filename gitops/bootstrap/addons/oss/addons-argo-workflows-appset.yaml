@@ -58,6 +58,11 @@ spec:
               - $values/{{.metadata.annotations.addons_repo_basepath}}environments/default/addons/{{.values.addonChart}}/values.yaml
               - $values/{{.metadata.annotations.addons_repo_basepath}}environments/{{.metadata.labels.environment}}/addons/{{.values.addonChart}}/values.yaml
               - $values/{{.metadata.annotations.addons_repo_basepath}}clusters/{.{name}}/addons/{{.values.addonChart}}/values.yaml
+            values: |
+              workflow:
+                serviceAccount:
+                  annotations:
+                    eks.amazonaws.com/role-arn: test-irsa-role
       destination:
         namespace: '{{default "argo-workflows" .metadata.annotations.argo_workflows_namespace}}'
         name: '{{.name}}'
