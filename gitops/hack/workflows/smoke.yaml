@@ -21,6 +21,40 @@ spec:
     steps:
     - - name: step1
         template: split-nodegroups
+    - - name: step2
+        template: migrate-nodegroup
+        arguments:
+          parameters:
+          - name: nodegroup
+            value: "{{item.nodegroup}}"
+          - name: cluster
+            value: "{{item.cluster}}"
+        withParam: "{{steps.step1.outputs.result}}"
+
+  - name: migrate-nodegroup
+    inputs:
+      parameters:
+      - name: nodegroup
+      - name: cluster
+    container:
+      image: csantanapr/python-argocon:1.0
+      command: [python]
+      source: |
+        import boto3
+        import sys
+        import json
+        from infralib import
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        cluster = {{inputs.parameters.cluster}}
+        nodegroup = {{inputs.parameters.nodegroup}}
+        json.dump(nodegroup, sys.stdout)
+
+      volumeMounts:
+        - name: lib
+          mountPath: "/argo/staging/infralib.py"
+          subPath: "infralib.py"
 
 
   - name: split-nodegroups
@@ -29,12 +63,17 @@ spec:
       command: [python]
       source: |
         import boto3
+        import sys
+        import json
         from infralib import *
+
         session = boto3.Session()
         eks = session.client('eks')
         cluster = 'argocon-1'
-        for nodegroup_name in get_eks_cluster_nodegroups(eks, cluster):
-          print(nodegroup_name)
+        nodegroups = get_eks_cluster_nodegroups(eks, cluster)
+        # create new array out of nodegroups array with each item on object with keys cluster and nodegroup
+        nodegroups = [{'cluster': cluster, 'nodegroup': ng} for ng in nodegroups]
+        json.dump(nodegroups, sys.stdout)
 
       volumeMounts:
         - name: lib
