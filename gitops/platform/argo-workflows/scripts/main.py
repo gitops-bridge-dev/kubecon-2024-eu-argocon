@@ -53,15 +53,6 @@ def karpenter_mode(cluster, eks, ec2):
             eks,
             clusterName=cluster,
             nodegroupName=nodegroup_name,
-            taints={
-                'addOrUpdateTaints': [
-                    {
-                        'key': 'migratedfrom',
-                        'value': 'karpenter',
-                        'effect': 'NO_EXECUTE'
-                    },
-                ]
-            },
             scalingConfig={
                 'desiredSize': 0,
                 'minSize': 0,
@@ -99,28 +90,19 @@ def nodegroup_mode(cluster, eks):
             k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/max'])
         desired_size = int(
             k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/desired'])
-        # remove NO_EXECUTE taint from nodes and restore scalingConfig
+        # restore scalingConfig
         print("Restoring scaling config for nodegroup "+nodegroup_name)
         update_nodegroup(
             eks,
             clusterName=cluster,
             nodegroupName=nodegroup_name,
-            taints={
-                'removeTaints': [
-                    {
-                        'key': 'migratedfrom',
-                        'value': 'karpenter',
-                        'effect': 'NO_EXECUTE'
-                    },
-                ]
-            },
             scalingConfig={
                 'desiredSize': desired_size,
                 'minSize': min_size,
                 'maxSize': max_size
             }
         )
-        # scale cluster-autoscaler to zero
+        # scale cluster-autoscaler from zero
         scale_deployment(
             "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
 

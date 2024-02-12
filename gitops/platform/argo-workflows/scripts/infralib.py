@@ -335,12 +335,7 @@ def update_nodegroup(client, **kargs):
     https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/eks/client/update_nodegroup_config.html
     """
     try:
-        response = client.update_nodegroup_config(
-            clusterName=kargs['clusterName'],
-            nodegroupName=kargs['nodegroupName'],
-            taints=kargs['taints'],
-            scalingConfig=kargs['scalingConfig']
-        )
+        response = client.update_nodegroup_config(**kargs)
         # wait for the node group to update
         waiter = client.get_waiter('nodegroup_active')
         waiter.wait(clusterName=kargs['clusterName'],

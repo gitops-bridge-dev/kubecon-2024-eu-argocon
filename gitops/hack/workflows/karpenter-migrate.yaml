@@ -7,6 +7,9 @@ metadata:
     workflows.argoproj.io/description: |
       This workflow migrate nodegroups to karpenter.
 spec:
+  podMetadata:
+    annotations:
+      karpenter.sh/do-not-disrupt: "true"
   ttlStrategy:
     secondsAfterCompletion: 600 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
   automountServiceAccountToken: true
@@ -38,7 +41,7 @@ spec:
         - name: lib
           mountPath: "/argo/staging/infralib.py"
           subPath: "infralib.py"
-      image: csantanapr/python-argocon:1.0
+      image: csantanapr/python-argocon:1.1
       command: [python]
       source: |
         import boto3
@@ -64,7 +67,7 @@ spec:
         - name: lib
           mountPath: "/argo/staging/infralib.py"
           subPath: "infralib.py"
-      image: csantanapr/python-argocon:1.0
+      image: csantanapr/python-argocon:1.1
       command: [python]
       source: |
         nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
@@ -111,15 +114,6 @@ spec:
             eks,
             clusterName=cluster,
             nodegroupName=nodegroup_name,
-            taints={
-                'addOrUpdateTaints': [
-                    {
-                        'key': 'migratedfrom',
-                        'value': 'karpenter',
-                        'effect': 'NO_EXECUTE'
-                    },
-                ]
-            },
             scalingConfig={
                 'desiredSize': 0,
                 'minSize': 0,
