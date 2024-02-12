@@ -126,9 +126,6 @@ spec:
         namespace: '{{metadata.annotations.cluster_autoscaler_namespace}}'
         name: '{{name}}'
       syncPolicy:
-        automated:
-          prune: true
-          selfHeal: false
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true  # Big CRDs.
