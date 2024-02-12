@@ -22,6 +22,9 @@ spec:
               elements:
                 - team: "team-1"
                 - team: "team-2"
+                - team: "team-3"
+                - team: "team-4"
+                - team: "team-5"
   template:
     metadata:
       name: app-{{team}}
@@ -36,8 +39,14 @@ spec:
         targetRevision: '{{metadata.annotations.workload_repo_revision}}'
         helm:
           releaseName: '{{team}}'
-          valueFiles:
-            - values-{{team}}.yaml
+          values: |
+            nodeSelector:
+              team: "{{team}}"
+            tolerations:
+              - key: "dedicated"
+                operator: "Equal"
+                value: "{{team}}"
+                effect: "NoSchedule"
       destination:
         name: '{{name}}'
         namespace: '{{team}}'

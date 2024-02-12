@@ -35,7 +35,7 @@ Use eks-node-viewer for nodegroups
 ```shell
 eks-node-viewer --kubeconfig /tmp/argocon-1 --nodeSelector eks.amazonaws.com/nodegroup  -disable-pricing
 ```
-### Listing Node from Node Group
+### Listing Node from Karpenter Node Pool
 To get all the nodes created by a node group
 ```shell
 watch kubectl get nodes -l karpenter.sh/nodepool
@@ -46,7 +46,7 @@ watch kubectl get nodes -l karpenter.sh/nodepool,team=team-1
 ```
 Use eks-node-viewer for nodegroups
 ```shell
-eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector karpenter.sh/nodepool -disable-pricing
+eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector migrate.karpenter.io/nodegroup -disable-pricing
 ```
 
 ArgoCD Port Forward:

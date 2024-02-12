@@ -1,7 +1,0 @@
-nodeSelector:
-  team: team-1
-tolerations:
-- key: "dedicated"
-  operator: "Equal"
-  value: "team-1"
-  effect: "NoSchedule"
