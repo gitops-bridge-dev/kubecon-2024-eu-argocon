@@ -15,7 +15,7 @@ server:
   secure: false
   # -- A list of supported authentication modes. Available values are `server`, `client`, or `sso`. If you provide sso, please configure `.Values.server.sso` as well.
   ## Ref: https://argoproj.github.io/argo-workflows/argo-server-auth-mode/
-  authModes: ['client']
+  authModes: ['server']
   extraEnv:
     - name: FIRST_TIME_USER_MODAL
       value: "false"
