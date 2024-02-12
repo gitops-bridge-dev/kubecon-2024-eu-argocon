@@ -1,13 +1,22 @@
 from botocore.exceptions import ClientError
 import json
 import time
+import os
 from datetime import datetime
 import kubernetes.client
 import kubernetes.config as config
 
 
-# Configs can be set in Configuration class directly or using helper utility
-config.load_kube_config()
+def load_kubernetes_configuration():
+    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    if os.path.exists(token_path):
+        print("Running inside a Kubernetes cluster. Using in-cluster config.")
+        config.load_incluster_config()
+    else:
+        print("Running outside a Kubernetes cluster. Using kube-config file.")
+        config.load_kube_config()
+
+load_kubernetes_configuration()
 api = kubernetes.client.CustomObjectsApi()
 
 

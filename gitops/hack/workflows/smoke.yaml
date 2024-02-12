@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  namespace: argo-workflows
+  generateName: karpenter-migrate-
+  annotations:
+    workflows.argoproj.io/description: |
+      This workflow migrate nodegroups to karpenter.
+spec:
+  ttlStrategy:
+    secondsAfterCompletion: 180 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
+  automountServiceAccountToken: true
+  volumes:
+    - name: lib
+      configMap:
+        name: karpenter-migrator
+  serviceAccountName: argo-workflow
+  entrypoint: migrate
+  templates:
+  - name: migrate
+    steps:
+    - - name: step1
+        template: split-nodegroups
+
+
+  - name: split-nodegroups
+    script:
+      image: csantanapr/python-argocon:1.0
+      command: [python]
+      source: |
+        import boto3
+        from infralib import *
+        session = boto3.Session()
+        eks = session.client('eks')
+        cluster = 'argocon-1'
+        for nodegroup_name in get_eks_cluster_nodegroups(eks, cluster):
+          print(nodegroup_name)
+
+      volumeMounts:
+        - name: lib
+          mountPath: "/argo/staging/infralib.py"
+          subPath: "infralib.py"
+
+
