@@ -1,0 +1,132 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  namespace: argo-workflows
+  generateName: karpenter-migrate-
+  annotations:
+    workflows.argoproj.io/description: |
+      This workflow migrate nodegroups to karpenter.
+spec:
+  ttlStrategy:
+    secondsAfterCompletion: 600 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
+  automountServiceAccountToken: true
+  volumes:
+    - name: lib
+      configMap:
+        name: karpenter-migrator
+  serviceAccountName: argo-workflow
+  entrypoint: migrate
+  templates:
+  - name: migrate
+    steps:
+    - - name: get-nodegroups
+        template: get-nodegroups
+    - - name: migrate-nodegroup
+        template: migrate-nodegroup
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{item.nodegroup_name}}"
+          - name: cluster
+            value: "{{item.cluster}}"
+        withParam: "{{steps.get-nodegroups.outputs.result}}"
+
+
+  - name: get-nodegroups
+    script:
+      volumeMounts:
+        - name: lib
+          mountPath: "/argo/staging/infralib.py"
+          subPath: "infralib.py"
+      image: csantanapr/python-argocon:1.0
+      command: [python]
+      source: |
+        import boto3
+        import sys
+        import json
+        from infralib import *
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        cluster = 'argocon-1'
+        nodegroups = get_eks_cluster_nodegroups(eks, cluster)
+        # create new array out of nodegroups array with each item on object with keys cluster and nodegroup
+        nodegroups = [{'cluster': cluster, 'nodegroup_name': ng} for ng in nodegroups]
+        json.dump(nodegroups, sys.stdout)
+
+  - name: migrate-nodegroup
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
+    script:
+      volumeMounts:
+        - name: lib
+          mountPath: "/argo/staging/infralib.py"
+          subPath: "infralib.py"
+      image: csantanapr/python-argocon:1.0
+      command: [python]
+      source: |
+        nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
+        cluster = "{{inputs.parameters.cluster}}"
+        print("nodegroup_name: " + nodegroup_name)
+        print("cluster: " + cluster)
+
+        import boto3
+        import sys
+        import json
+        import yaml
+        from infralib import *
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        ec2 = session.client('ec2')
+
+        nodegroup = get_node_group(eks, cluster, nodegroup_name)
+        k8s_karpenter_node_pool = get_custom_object(nodegroup_name, "NodePool")
+        print("Checking the node pool")
+        # skip if there is already a corresponding karpenter node pool
+        if k8s_karpenter_node_pool is not None:
+          sys.exit(0)
+        karpenter_node_class = generate_karpenter_node_class(
+            eks, ec2, nodegroup)
+        # print karpenter_node_class in yaml
+        print("---")
+        print(yaml.dump(karpenter_node_class, default_flow_style=False))
+        karpenter_node_pool = generate_karpenter_node_pool(nodegroup)
+        print("---")
+        print(yaml.dump(karpenter_node_pool, default_flow_style=False))
+        # create custom object with the node class
+        apply_or_create_custom_object(karpenter_node_class, "EC2NodeClass")
+        apply_or_create_custom_object(karpenter_node_pool, "NodePool")
+
+        # scale cluster-autoscaler to zero
+        scale_deployment(
+            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
+        # evict all pods by placing a NO_EXECUTE taint on the nodes
+        # scale down to zero by updating scalingConfig, and set max to 1
+        print("Evicting pods from nodegroup " +
+              nodegroup_name+" and scaling to zero")
+        update_nodegroup(
+            eks,
+            clusterName=cluster,
+            nodegroupName=nodegroup_name,
+            taints={
+                'addOrUpdateTaints': [
+                    {
+                        'key': 'migratedfrom',
+                        'value': 'karpenter',
+                        'effect': 'NO_EXECUTE'
+                    },
+                ]
+            },
+            scalingConfig={
+                'desiredSize': 0,
+                'minSize': 0,
+                'maxSize': 1
+            }
+        )
+
+
+
+
