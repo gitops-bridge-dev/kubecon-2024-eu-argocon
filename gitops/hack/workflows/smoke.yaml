@@ -8,7 +8,7 @@ metadata:
       This workflow migrate nodegroups to karpenter.
 spec:
   ttlStrategy:
-    secondsAfterCompletion: 180 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
+    secondsAfterCompletion: 600 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
   automountServiceAccountToken: true
   volumes:
     - name: lib
@@ -43,13 +43,26 @@ spec:
         import boto3
         import sys
         import json
+        import yaml
         from infralib import
 
         session = boto3.Session()
         eks = session.client('eks')
         cluster = {{inputs.parameters.cluster}}
         nodegroup = {{inputs.parameters.nodegroup}}
-        json.dump(nodegroup, sys.stdout)
+        k8s_karpenter_node_pool = get_custom_object(nodegroup_name, "NodePool")
+        # skip if there is already a corresponding karpenter node pool
+        if k8s_karpenter_node_pool is not None:
+            continue
+        karpenter_node_class = generate_karpenter_node_class(
+            eks, ec2, nodegroup)
+        # print karpenter_node_class in yaml
+        print("---")
+        print(yaml.dump(karpenter_node_class, default_flow_style=False))
+        karpenter_node_pool = generate_karpenter_node_pool(nodegroup)
+        print("---")
+        print(yaml.dump(karpenter_node_pool, default_flow_style=False))
+        # create custom object with the node class
 
       volumeMounts:
         - name: lib
