@@ -13,48 +13,58 @@ spec:
   ttlStrategy:
     secondsAfterCompletion: 600 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
   automountServiceAccountToken: true
-  volumes:
-    - name: lib
-      configMap:
-        name: karpenter-migrator
   serviceAccountName: argo-workflow
-  entrypoint: migrate
+  entrypoint: rollback
+  arguments:
+    parameters:
+    - name: cluster
+      value: argocon-1
   templates:
-  - name: migrate
+  - name: rollback
+    inputs:
+      parameters:
+      - name: cluster
     steps:
     - - name: get-nodegroups
         template: get-nodegroups
-    - - name: rollback-nodegroup
+        arguments:
+          parameters:
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+    - - name: rollback
         template: rollback-nodegroup
         arguments:
           parameters:
           - name: nodegroup_name
-            value: "{{item.nodegroup_name}}"
+            value: "{{item}}"
           - name: cluster
-            value: "{{item.cluster}}"
+            value: "{{inputs.parameters.cluster}}"
         withParam: "{{steps.get-nodegroups.outputs.result}}"
 
 
   - name: get-nodegroups
+    inputs:
+      parameters:
+      - name: cluster
     script:
-      volumeMounts:
-        - name: lib
-          mountPath: "/argo/staging/infralib.py"
-          subPath: "infralib.py"
-      image: csantanapr/python-argocon:1.1
+      image: csantanapr/python-argocon:1.6
       command: [python]
       source: |
+        cluster = "{{inputs.parameters.cluster}}"
+
         import boto3
         import sys
         import json
-        from infralib import *
+        from sharedlib import infra
 
         session = boto3.Session()
         eks = session.client('eks')
-        cluster = 'argocon-1'
-        nodegroups = get_eks_cluster_nodegroups(eks, cluster)
-        # create new array out of nodegroups array with each item on object with keys cluster and nodegroup
-        nodegroups = [{'cluster': cluster, 'nodegroup_name': ng} for ng in nodegroups]
+        nodegroups = []
+        for nodegroup_name in infra.get_eks_cluster_nodegroups(eks, cluster):
+          if infra.get_custom_object(nodegroup_name, "NodePool") is None:
+            continue
+          nodegroups.append(nodegroup_name)
+
         json.dump(nodegroups, sys.stdout)
 
   - name: rollback-nodegroup
@@ -62,45 +72,55 @@ spec:
       parameters:
       - name: nodegroup_name
       - name: cluster
+    steps:
+    - - name: scale-up
+        template: scale-up-nodegroup
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{inputs.parameters.nodegroup_name}}"
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+    - - name: delete-karpenter
+        template: delete-karpenter
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{inputs.parameters.nodegroup_name}}"
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+
+
+  - name: scale-up-nodegroup
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
     script:
-      volumeMounts:
-        - name: lib
-          mountPath: "/argo/staging/infralib.py"
-          subPath: "infralib.py"
-      image: csantanapr/python-argocon:1.1
+      image: csantanapr/python-argocon:1.6
       command: [python]
       source: |
         nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
         cluster = "{{inputs.parameters.cluster}}"
-        print("nodegroup_name: " + nodegroup_name)
-        print("cluster: " + cluster)
 
         import boto3
         import sys
-        import json
-        import yaml
-        from infralib import *
+        from sharedlib import infra
+
+        # Get the scaling config from karpenter annotations
+        k8s_karpenter_node_pool = infra.get_custom_object(nodegroup_name, "NodePool")
+        min_size = int(k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/min'])
+        max_size = int(k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/max'])
+        desired_size = int(k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/desired'])
 
         session = boto3.Session()
         eks = session.client('eks')
 
-        # Get the corresponding karpenter node pool
-        print("Restoring Node Group "+nodegroup_name +
-              " from corresponding NodePool")
-        k8s_karpenter_node_pool = get_custom_object(nodegroup_name, "NodePool")
-        # if k8s_karpenter_node_pool is None then continue
-        if k8s_karpenter_node_pool is None:
-            sys.exit(0)
-        # Get the scaling config from annotations
-        min_size = int(
-            k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/min'])
-        max_size = int(
-            k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/max'])
-        desired_size = int(
-            k8s_karpenter_node_pool['metadata']['annotations']['migrate.karpenter.io/desired'])
-        # remove NO_EXECUTE taint from nodes and restore scalingConfig
-        print("Restoring scaling config for nodegroup "+nodegroup_name)
-        update_nodegroup(
+        print("Updating nodegroup " + nodegroup_name, file=sys.stderr)
+        print("min_size="+str(min_size), file=sys.stderr)
+        print("max_size="+str(max_size), file=sys.stderr)
+        print("desired_size="+str(desired_size), file=sys.stderr)
+        infra.update_nodegroup(
             eks,
             clusterName=cluster,
             nodegroupName=nodegroup_name,
@@ -110,15 +130,26 @@ spec:
                 'maxSize': max_size
             }
         )
-        # scale cluster-autoscaler to zero
-        scale_deployment(
-            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
+        print("Scaling up autoscaler ", file=sys.stderr)
+        infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
 
-        # Delete nodepool and nodeclass
-        print("Deleting NodePool"+nodegroup_name)
-        delete_custom_object(nodegroup_name, "NodePool")
-        print("Deleting NodeClass for nodegroup "+nodegroup_name)
-        delete_custom_object(nodegroup_name, "EC2NodeClass")
+  - name: delete-karpenter
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
+        cluster = "{{inputs.parameters.cluster}}"
 
+        import sys
+        from sharedlib import infra
 
+        print("Deleting NodePool"+nodegroup_name, file=sys.stderr)
+        infra.delete_custom_object(nodegroup_name, "NodePool")
 
+        print("Deleting NodeClass for nodegroup "+nodegroup_name, file=sys.stderr)
+        infra.delete_custom_object(nodegroup_name, "EC2NodeClass")

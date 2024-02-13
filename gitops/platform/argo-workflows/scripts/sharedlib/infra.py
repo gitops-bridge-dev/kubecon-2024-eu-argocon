@@ -11,11 +11,14 @@ import kubernetes.config as config
 def load_kubernetes_configuration():
     token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     if os.path.exists(token_path):
-        print("Running inside a Kubernetes cluster. Using in-cluster config.",file=sys.stderr)
+        print(
+            "Running inside a Kubernetes cluster. Using in-cluster config.", file=sys.stderr)
         config.load_incluster_config()
     else:
-        print("Running outside a Kubernetes cluster. Using kube-config file.",file=sys.stderr)
+        print(
+            "Running outside a Kubernetes cluster. Using kube-config file.", file=sys.stderr)
         config.load_kube_config()
+
 
 load_kubernetes_configuration()
 api = kubernetes.client.CustomObjectsApi()
@@ -181,7 +184,7 @@ def apply_or_create_custom_object(object, kind):
             field_manager="karpenter-migrator"
         )
         print("%s %s updated." %
-              (kind, object['kind']+object['metadata']['name']),file=sys.stderr)
+              (kind, object['kind']+object['metadata']['name']), file=sys.stderr)
         return api_response
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
@@ -195,7 +198,7 @@ def apply_or_create_custom_object(object, kind):
                 field_manager="karpenter-migrator"
             )
             print("%s %s created." %
-                  (kind, object['kind']+object['metadata']['name']),file=sys.stderr)
+                  (kind, object['kind']+object['metadata']['name']), file=sys.stderr)
             return api_response
         else:
             print(
@@ -227,7 +230,7 @@ def get_custom_object(object_name, kind):
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
             # Custom object doesn't exist
-            print("%s %s not found" % (kind, object_name),file=sys.stderr)
+            print("%s %s not found" % (kind, object_name), file=sys.stderr)
             return None
         else:
             print(
@@ -260,7 +263,7 @@ def delete_custom_object(object_name, kind):
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
             # Custom object doesn't exist
-            print("%s %s not found" % (kind, object_name),file=sys.stderr)
+            print("%s %s not found" % (kind, object_name), file=sys.stderr)
             return None
         else:
             print(
@@ -285,7 +288,7 @@ def scale_deployment(deployment_name, namespace, replicas):
         if e.status == 404:
             # Custom object doesn't exist
             print("deployment %s in %s not found" %
-                  (deployment_name, namespace),file=sys.stderr)
+                  (deployment_name, namespace), file=sys.stderr)
             return None
         else:
             print(
@@ -359,7 +362,8 @@ def set_scaling_config_for_nodegroup(client, cluster, nodegroup, scaling_config)
         # wait for the node group to update
         waiter = client.get_waiter('nodegroup_active')
         waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
-        print("Scaling config set for node group %s" % nodegroup,file=sys.stderr)
+        print("Scaling config set for node group %s" %
+              nodegroup, file=sys.stderr)
 
         return response
     except ClientError as e:
@@ -380,7 +384,7 @@ def add_taint_to_nodegroup(client, cluster, nodegroup, taints):
         # wait for the node group to update
         waiter = client.get_waiter('nodegroup_active')
         waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
-        print("Taint added to node group %s" % nodegroup,file=sys.stderr)
+        print("Taint added to node group %s" % nodegroup, file=sys.stderr)
 
         return response
     except ClientError as e:
@@ -401,7 +405,7 @@ def remove_taint_to_nodegroup(client, cluster, nodegroup, taints):
         # wait for the node group to update
         waiter = client.get_waiter('nodegroup_active')
         waiter.wait(clusterName=cluster, nodegroupName=nodegroup)
-        print("Taint removed to node group %s" % nodegroup,file=sys.stderr)
+        print("Taint removed to node group %s" % nodegroup, file=sys.stderr)
 
         return response
     except ClientError as e:
