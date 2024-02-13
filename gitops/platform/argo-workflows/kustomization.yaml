@@ -3,12 +3,3 @@ kind: Kustomization
 
 resources:
 - rbac.yaml
-
-# declare ConfigMap from a ConfigMapGenerator
-configMapGenerator:
-- name: karpenter-migrator
-  files:
-    - scripts/infralib.py
-
-generatorOptions:
-  disableNameSuffixHash: true
