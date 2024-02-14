@@ -25,6 +25,11 @@ spec:
                 - team: "team-3"
                 - team: "team-4"
                 - team: "team-5"
+                - team: "team-6"
+                - team: "team-7"
+                - team: "team-8"
+                - team: "team-9"
+                - team: "team-10"
   template:
     metadata:
       name: app-{{team}}
@@ -40,6 +45,7 @@ spec:
         helm:
           releaseName: '{{team}}'
           values: |
+            replicaCount: 2
             nodeSelector:
               team: "{{team}}"
             tolerations:

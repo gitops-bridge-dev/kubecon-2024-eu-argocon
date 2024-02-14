@@ -5,7 +5,7 @@ module "eks_managed_node_group" {
   source = "terraform-aws-modules/eks/aws//modules/eks-managed-node-group"
   version = "~> 19.13"
 
-  count = local.create_node_groups ? 5 : 0
+  count = local.create_node_groups ? 10 : 0
 
   # set name to team- count.index + 1
   name = "team-${count.index + 1}"
@@ -25,10 +25,18 @@ module "eks_managed_node_group" {
   cluster_primary_security_group_id = module.eks.cluster_primary_security_group_id
   vpc_security_group_ids            = [module.eks.node_security_group_id]
 
-  instance_types = [count.index + 1 <= 3 ? "t3.medium" : "m5.large" ]
+  instance_types = [count.index + 1 <= 5 ? "m5.medium" : "c5.large" ]
+  capacity_type  = count.index + 1 <= 5 ? "SPOT" : "ON_DEMAND"
 
-  min_size     = 1
-  max_size     = 3
+
+  tags = {
+    Name = "team-${count.index + 1}"
+    event = "argocon-eu-2024"
+    team  = "team-${count.index + 1}"
+  }
+
+  min_size     = 0
+  max_size     = 10
   desired_size = 2
   labels = {
     type  = "node-group"

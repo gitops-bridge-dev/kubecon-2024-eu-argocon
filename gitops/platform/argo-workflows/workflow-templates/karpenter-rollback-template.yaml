@@ -134,7 +134,8 @@ spec:
             }
         )
         print("Scaling up autoscaler ", file=sys.stderr)
-        infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
+        # TODO make autoscaler conditional
+        # infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
 
   - name: delete-karpenter
     inputs:

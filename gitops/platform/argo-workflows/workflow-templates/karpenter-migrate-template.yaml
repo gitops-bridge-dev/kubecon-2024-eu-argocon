@@ -165,7 +165,8 @@ spec:
         ec2 = session.client('ec2')
 
         # scale down nodegroup
-        infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
+        # TODO make autoscaler conditional
+        # infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
         infra.update_nodegroup(
             eks,
             clusterName=cluster,

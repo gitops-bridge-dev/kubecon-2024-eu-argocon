@@ -72,14 +72,13 @@ argo logs @latest -n argo-workflows
 ```
 
 
-
-
-
 ### TODOs:
-- Race condition between auto-scaler and karpenter both want to handle the Pending pod, auto-scaler scales up the asg, and karpenter deploys a node.
 
 **GitOps:**
 - Rename appset relase name to `aws-cluster-autoscaler`
+
+### Argo Workflows
+- multicluster support (need to disable autoscaler, and find clusters by tag and region)
 
 **Terraform:**
 - rename appset cluster-addons to bootstrap
@@ -95,27 +94,4 @@ argo logs @latest -n argo-workflows
     ```
 
 
-
-
-### Argo Workflows
-- Write workflow template
-- White argo events listener
-- Design CRD
-```yaml
-apiVersion: migrator.karpenter.io/v1alpha1
-Kind: KarpenterMigrator
-metadata:
-  name: team-a
-spec:
-  # karpenter or noderoup mode
-  mode: karpenter
-  # tags to find eks cluster
-  clusterSelector:
-    Blueprint: karpenter
-  # tags to find node groups
-  groupSelector:
-    team: team-a
-  # region to target
-  region: us-east-2
-```
 
