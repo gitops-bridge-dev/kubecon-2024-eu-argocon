@@ -8,6 +8,13 @@ notifications:
 
 controller:
   replicas: 1 # Additional replicas will cause sharding of managed clusters across number of replicas.
+  resources:
+    requests:
+      cpu: '2000m'
+      memory: '1024Mi'
+    limits:
+      cpu: '2000m'
+      memory: '1024Mi'
   metrics:
     enabled: true
     service:
@@ -25,10 +32,10 @@ repoServer:
     minReplicas: 1
   resources: # Adjust based on your specific use case (required for HPA)
     requests:
-      cpu: '100m'
+      cpu: '1000m'
       memory: '1024Mi'
     limits:
-      cpu: '200m'
+      cpu: '1000m'
       memory: '1024Mi'
   metrics:
     enabled: true
@@ -50,10 +57,10 @@ server:
     minReplicas: 1
   resources: # Adjust based on your specific use case (required for HPA)
     requests:
-      cpu: '100m'
-      memory: '256Mi'
+      cpu: '500m'
+      memory: '512Mi'
     limits:
-      cpu: '200m'
+      cpu: '500m'
       memory: '512Mi'
   metrics:
     enabled: true
