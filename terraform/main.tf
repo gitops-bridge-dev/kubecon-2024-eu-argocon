@@ -142,6 +142,10 @@ locals {
       env:
         - name: ARGOCD_SYNC_WAVE_DELAY
           value: '30'
+    dex:
+      enabled: false
+    notifications:
+      enabled: false
 
     EOT
 

@@ -15,6 +15,7 @@ spec:
           - clusters:
               values:
                 addonChart: cluster-autoscaler
+                releaseName: aws-cluster-autoscaler
                 # anything not staging or prod use this version
                 addonChartVersion: 9.35.0
                 addonChartRepository: https://kubernetes.github.io/autoscaler
@@ -105,7 +106,7 @@ spec:
           repoURL: '{{values.addonChartRepository}}'
           targetRevision: '{{values.addonChartVersion}}'
           helm:
-            releaseName: '{{values.addonChart}}'
+            releaseName: '{{values.releaseName}}'
             ignoreMissingValueFiles: true
             valueFiles:
               - $values/{{metadata.annotations.addons_repo_basepath}}environments/default/addons/{{values.addonChart}}/values.yaml

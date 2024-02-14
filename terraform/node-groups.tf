@@ -37,7 +37,7 @@ module "eks_managed_node_group" {
 
   min_size     = 0
   max_size     = 10
-  desired_size = 3
+  desired_size = 4
   labels = {
     type  = "node-group"
     event = "argocon-eu-2024"

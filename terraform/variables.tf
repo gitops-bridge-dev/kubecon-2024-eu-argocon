@@ -35,7 +35,6 @@ variable "addons" {
 
     # Extras
     enable_metrics_server               = true
-    enable_aws_node_termination_handler = false
 
   }
 }
