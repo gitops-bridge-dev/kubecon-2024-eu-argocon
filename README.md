@@ -114,10 +114,11 @@ argo logs @latest -n argo-workflows
 ### TODOs:
 
 ### GitOps:
+- save karpenters in gitops repo for argocd to sync
 
 ### Argo Workflows
-- multicluster support (handle multiple kubeconfigs)
 - save the original value for min,desire,max in nodegorup tags instead of karpenter
+- multicluster support (handle multiple kubeconfigs)
 
 ### Terraform:
 - rename appset cluster-addons to bootstrap
