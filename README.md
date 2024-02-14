@@ -88,6 +88,11 @@ argo logs @latest -n argo-workflows
 - save the original value for min,desire,max in nodegorup tags instead of karpenter
 **Terraform:**
 - rename appset cluster-addons to bootstrap
+- disable argocd dex and notifications
+    dex:
+      enabled: false
+    notifications:
+      enabled: false
 - argocd load balancer using classic and it doesn't work. This is because svc LoadBalancer is created before loadbalancer controller is running.
     To fix delete `svc` and recreate with argocd sync
     ```shell

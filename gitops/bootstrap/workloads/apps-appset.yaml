@@ -45,7 +45,7 @@ spec:
         helm:
           releaseName: '{{team}}'
           values: |
-            replicaCount: 0
+            replicaCount: 2
             nodeSelector:
               team: "{{team}}"
             tolerations:
