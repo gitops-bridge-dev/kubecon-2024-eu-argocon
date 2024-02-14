@@ -1,7 +1,7 @@
 # kubecon-2024-eu-argocon
 Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://github.com/kubernetes/autoscaler) to [CNCF Karpenter](https://github.com/kubernetes-sigs/karpenter)
 
-# Running the Demo
+# Run the Demo
 
 Tools:
 - terraform
@@ -12,6 +12,9 @@ Terminal: Terraform
 ```shell
 cd terraform/
 terraform apply
+```
+Review the output and run
+```shell
 export KUBECONFIG="/tmp/argocon-1"
 aws eks --region us-east-2 update-kubeconfig --name argocon-1
 kubectl get pods -A
@@ -25,7 +28,9 @@ export KUBECONFIG="/tmp/argocon-1"
 Terminal: Port forward argocd
 ```shell
 export KUBECONFIG="/tmp/argocon-1"
-echo "http://locahost:8080"
+echo "ArgoCD Username: admin"
+echo "ArgoCD Password: $(kubectl get secrets argocd-initial-admin-secret -n argocd --template="{{index .data.password | base64decode}}")"
+echo "ArgoCD URL: http://localhost:8080"
 kubectl port-forward -n argocd svc/argo-cd-argocd-server 8080:80
 ```
 
@@ -51,7 +56,7 @@ export KUBECONFIG="/tmp/argocon-1"
 eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector karpenter.sh/nodepool -disable-pricing
 ```
 
-# Deleting Demo
+# Delete Demo
 ```shell
 cd terraform
 ./destroy.sh
