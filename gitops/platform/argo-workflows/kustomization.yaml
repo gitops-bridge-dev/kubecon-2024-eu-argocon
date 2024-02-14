@@ -3,3 +3,5 @@ kind: Kustomization
 
 resources:
 - rbac.yaml
+- workflow-templates/karpenter-migrate-template.yaml
+- workflow-templates/karpenter-rollback-template.yaml

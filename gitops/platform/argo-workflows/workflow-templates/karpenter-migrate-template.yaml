@@ -1,0 +1,178 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  namespace: argo-workflows
+  name: karpenter-migrate
+  annotations:
+    workflows.argoproj.io/description: |
+      This workflow migrate nodegroups to karpenter.
+spec:
+  podMetadata:
+    annotations:
+      karpenter.sh/do-not-disrupt: "true"
+  ttlStrategy:
+    secondsAfterCompletion: 600 # Time to live after workflow is completed, replaces ttlSecondsAfterFinished
+  automountServiceAccountToken: true
+  serviceAccountName: argo-workflow
+  entrypoint: migrate
+  arguments:
+    parameters:
+    - name: cluster
+      enum:
+      - argocon-1
+      - argocon-2
+      - argocon-3
+  templates:
+  - name: migrate
+    inputs:
+      parameters:
+      - name: cluster
+    steps:
+    - - name: get-nodegroups
+        template: get-nodegroups
+        arguments:
+          parameters:
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+    - - name: migrate
+        template: migrate-nodegroup
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{item}}"
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+        withParam: "{{steps.get-nodegroups.outputs.result}}"
+
+  - name: get-nodegroups
+    inputs:
+      parameters:
+      - name: cluster
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        cluster = "{{inputs.parameters.cluster}}"
+
+        import boto3
+        import sys
+        import json
+        from sharedlib import infra
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        nodegroups = []
+        for nodegroup_name in infra.get_eks_cluster_nodegroups(eks, cluster):
+          if infra.get_custom_object(nodegroup_name, "NodePool") is not None:
+            continue
+          nodegroups.append(nodegroup_name)
+
+        json.dump(nodegroups, sys.stdout)
+
+
+  - name: migrate-nodegroup
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
+    steps:
+    - - name: karpenter
+        template: generate-karpenter
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{inputs.parameters.nodegroup_name}}"
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+    - - name: scale-down
+        template: scale-down-nodegroup
+        arguments:
+          parameters:
+          - name: nodegroup_name
+            value: "{{inputs.parameters.nodegroup_name}}"
+          - name: cluster
+            value: "{{inputs.parameters.cluster}}"
+          - name: min_size
+            value: 0
+          - name: max_size
+            value: 1
+          - name: desired_size
+            value: 0
+
+
+  - name: generate-karpenter
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
+        cluster = "{{inputs.parameters.cluster}}"
+
+        import boto3
+        import sys
+        import yaml
+        from sharedlib import infra
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        ec2 = session.client('ec2')
+
+        # generate karpenter nodeclass and nodepool from nodegroup
+        nodegroup = infra.get_node_group(eks, cluster, nodegroup_name)
+        karpenter_node_class = infra.generate_karpenter_node_class(eks, ec2, nodegroup)
+        karpenter_node_pool = infra.generate_karpenter_node_pool(nodegroup)
+
+        # print karpenter nodeclass and nodepool
+        print("---", file=sys.stderr)
+        print(yaml.dump(karpenter_node_class, default_flow_style=False), file=sys.stderr)
+        print("---", file=sys.stderr)
+        print(yaml.dump(karpenter_node_pool, default_flow_style=False), file=sys.stderr)
+
+        # create karpenter nodeclass and nodepool
+        infra.apply_or_create_custom_object(karpenter_node_class, "EC2NodeClass")
+        infra.apply_or_create_custom_object(karpenter_node_pool, "NodePool")
+
+
+
+  - name: scale-down-nodegroup
+    inputs:
+      parameters:
+      - name: nodegroup_name
+      - name: cluster
+      - name: min_size
+      - name: max_size
+      - name: desired_size
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        nodegroup_name = "{{inputs.parameters.nodegroup_name}}"
+        cluster = "{{inputs.parameters.cluster}}"
+        min_size = {{inputs.parameters.min_size}}
+        max_size = {{inputs.parameters.max_size}}
+        desired_size = {{inputs.parameters.desired_size}}
+
+        import boto3
+        import sys
+        from sharedlib import infra
+
+        session = boto3.Session()
+        eks = session.client('eks')
+        ec2 = session.client('ec2')
+
+        # scale down nodegroup
+        infra.scale_deployment("cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
+        infra.update_nodegroup(
+            eks,
+            clusterName=cluster,
+            nodegroupName=nodegroup_name,
+            scalingConfig={
+                'desiredSize': desired_size,
+                'minSize': min_size,
+                'maxSize': max_size
+            }
+        )
