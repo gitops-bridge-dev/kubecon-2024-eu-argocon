@@ -114,29 +114,11 @@ argo logs @latest -n argo-workflows
 ### TODOs:
 
 ### GitOps:
-- Rename appset relase name to `aws-cluster-autoscaler`
 
 ### Argo Workflows
-- multicluster support (need to disable autoscaler, and find clusters by tag and region)
+- multicluster support (handle multiple kubeconfigs)
 - save the original value for min,desire,max in nodegorup tags instead of karpenter
 
 ### Terraform:
 - rename appset cluster-addons to bootstrap
-- disable argocd dex and notifications
-    dex:
-      enabled: false
-    notifications:
-      enabled: false
-- argocd load balancer using classic and it doesn't work. This is because svc LoadBalancer is created before loadbalancer controller is running.
-    To fix delete `svc` and recreate with argocd sync
-    ```shell
-    kubectl delete svc -n argocd argo-cd-argocd-server
-    argocd app sync addon-in-cluster-argo-cd
-    ```
-    For now use port-forward
-    ```shell
-    kubectl port-forward -n argocd deployments/argo-cd-argocd-server 8080:8080
-    ```
-- There is a problem with IAM policy with termination node handler in terraform
-
 

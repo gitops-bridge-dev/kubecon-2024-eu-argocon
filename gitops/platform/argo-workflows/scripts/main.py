@@ -42,7 +42,7 @@ def karpenter_mode(cluster, eks, ec2):
 
         # scale cluster-autoscaler to zero
         infra.scale_deployment(
-            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 0)
+            "aws-cluster-autoscaler", "kube-system", 0)
         # evict all pods by placing a NO_EXECUTE taint on the nodes
         # scale down to zero by updating scalingConfig, and set max to 1
         print("Scale down nodegroup "+nodegroup_name)
@@ -101,7 +101,7 @@ def nodegroup_mode(cluster, eks):
         )
         # scale cluster-autoscaler from zero
         infra.scale_deployment(
-            "cluster-autoscaler-aws-cluster-autoscaler", "kube-system", 1)
+            "aws-cluster-autoscaler", "kube-system", 1)
 
         # Delete nodepool and nodeclass
         print("Deleting NodePool"+nodegroup_name)

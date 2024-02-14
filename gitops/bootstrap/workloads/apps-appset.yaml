@@ -36,6 +36,9 @@ spec:
       finalizers:
         # The default behaviour is foreground cascading deletion
         - resources-finalizer.argocd.argoproj.io
+      labels:
+        team: "{{team}}"
+        tier: workloads
     spec:
       project: default
       source:
