@@ -83,10 +83,7 @@ To get all the nodes created by a node group and used by `team-1`
 ```shell
 watch kubectl get nodes -l eks.amazonaws.com/nodegroup,team=team-1
 ```
-Use eks-node-viewer for nodegroups
-```shell
-eks-node-viewer --kubeconfig /tmp/argocon-1 --nodeSelector eks.amazonaws.com/nodegroup  -disable-pricing
-```
+
 ### Listing Node from Karpenter Node Pool
 To get all the nodes created by a node group
 ```shell
@@ -96,26 +93,7 @@ To get all the nodes created by a node group and used by `team-1`
 ```shell
 watch kubectl get nodes -l karpenter.sh/nodepool,team=team-1
 ```
-Use eks-node-viewer for nodegroups
-```shell
-eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector migrate.karpenter.io/nodegroup -disable-pricing
-```
 
-ArgoCD Port Forward:
-```shell
-kubectl port-forward -n argocd deployments/argo-cd-argocd-server 8080:8080
-```
-
-Use the Argo Workflow UI, use port-forward, and open url http://localhost:8081
-```shell
-kubectl port-forward -n argo-workflows svc/argo-workflows-server 8081:2746
-```
-
-
-Get authentication token using argo cli
-```shell
-argo auth token
-```
 Smoke test for argo-workflows:
 ```shell
 argo submit -n argo-workflows --serviceaccount argo-workflow https://raw.githubusercontent.com/argoproj/argo-workflows/main/examples/hello-world.yaml
