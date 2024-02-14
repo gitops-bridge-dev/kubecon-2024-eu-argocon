@@ -1,6 +1,10 @@
 # kubecon-2024-eu-argocon
 Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://github.com/kubernetes/autoscaler) to [CNCF Karpenter](https://github.com/kubernetes-sigs/karpenter)
 
+# Demo
+Workloads are disabled, edit [./gitops/bootstrap/workloads/apps-appset.yaml](./gitops/bootstrap/workloads/apps-appset.yaml) and set `replicaCount: 2`
+
+
 # Workflows
 
 ## Migrate workloads from nodegroup to karpenter (mode=karpenter)
@@ -72,6 +76,8 @@ argo logs @latest -n argo-workflows
 ```
 
 
+
+
 ### TODOs:
 
 **GitOps:**
@@ -79,7 +85,7 @@ argo logs @latest -n argo-workflows
 
 ### Argo Workflows
 - multicluster support (need to disable autoscaler, and find clusters by tag and region)
-
+- save the original value for min,desire,max in nodegorup tags instead of karpenter
 **Terraform:**
 - rename appset cluster-addons to bootstrap
 - argocd load balancer using classic and it doesn't work. This is because svc LoadBalancer is created before loadbalancer controller is running.
@@ -92,6 +98,6 @@ argo logs @latest -n argo-workflows
     ```shell
     kubectl port-forward -n argocd deployments/argo-cd-argocd-server 8080:8080
     ```
-
+- There is a problem with IAM policy with termination node handler in terraform
 
 

@@ -25,7 +25,7 @@ module "eks_managed_node_group" {
   cluster_primary_security_group_id = module.eks.cluster_primary_security_group_id
   vpc_security_group_ids            = [module.eks.node_security_group_id]
 
-  instance_types = [count.index + 1 <= 5 ? "m5.medium" : "c5.large" ]
+  instance_types = [count.index + 1 <= 5 ? "m5.large" : "c5.large" ]
   capacity_type  = count.index + 1 <= 5 ? "SPOT" : "ON_DEMAND"
 
 
@@ -37,7 +37,7 @@ module "eks_managed_node_group" {
 
   min_size     = 0
   max_size     = 10
-  desired_size = 2
+  desired_size = 3
   labels = {
     type  = "node-group"
     event = "argocon-eu-2024"
