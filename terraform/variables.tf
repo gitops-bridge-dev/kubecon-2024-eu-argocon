@@ -33,9 +33,6 @@ variable "addons" {
     # For ArgoCD web ui
     enable_aws_load_balancer_controller = true
 
-    # Extras
-    enable_metrics_server               = true
-
   }
 }
 # Addons Git
