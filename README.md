@@ -11,6 +11,7 @@ Tools:
 Terminal: Terraform
 ```shell
 cd terraform/
+terraform init
 terraform apply
 ```
 Review the output and run

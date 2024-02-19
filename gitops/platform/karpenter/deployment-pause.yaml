@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pause-pods
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: pause-pods
+  template:
+    metadata:
+      labels:
+        run: pause-pods
+    spec:
+      priorityClassName: pause-pods
+      containers:
+      - name: reserve-resources
+        image: public.ecr.aws/eks-distro/kubernetes/pause:3.9
+        resources:
+          requests:
+            cpu: "1"
