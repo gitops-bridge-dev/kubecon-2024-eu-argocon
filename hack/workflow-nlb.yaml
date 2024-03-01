@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  name: argo-workflows-server-nlb
+  namespace: argo-workflows
+spec:
+  ports:
+  - port: 80
+    targetPort: 2746
+  selector:
+    app.kubernetes.io/instance: argo-workflows
+    app.kubernetes.io/name: argo-workflows-server
+  type: LoadBalancer
