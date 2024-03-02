@@ -22,6 +22,11 @@ spec:
       - argocon-1
       - argocon-2
       - argocon-3
+    - name: using-autoscaler
+      value: "false"
+      enum:
+      - "true"
+      - "false"
   templates:
   - name: migrate
     inputs:
@@ -84,6 +89,9 @@ spec:
             value: "{{inputs.parameters.nodegroup_name}}"
           - name: cluster
             value: "{{inputs.parameters.cluster}}"
+    - - name: down-autoscaler
+        template: down-autoscaler
+        when: "{{workflow.parameters.using-autoscaler}} == true"
     - - name: scale-down
         template: scale-down-nodegroup
         arguments:
@@ -136,7 +144,15 @@ spec:
         infra.apply_or_create_custom_object(karpenter_node_class, "EC2NodeClass")
         infra.apply_or_create_custom_object(karpenter_node_pool, "NodePool")
 
-
+  - name: down-autoscaler
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        import sys
+        from sharedlib import infra
+        print("Scaling down autoscaler ", file=sys.stderr)
+        infra.scale_deployment("aws-cluster-autoscaler", "kube-system", 0)
 
   - name: scale-down-nodegroup
     inputs:
@@ -164,9 +180,6 @@ spec:
         eks = session.client('eks')
         ec2 = session.client('ec2')
 
-        # scale down nodegroup
-        # TODO make autoscaler conditional
-        # infra.scale_deployment("aws-cluster-autoscaler", "kube-system", 0)
         infra.update_nodegroup(
             eks,
             clusterName=cluster,

@@ -22,6 +22,11 @@ spec:
       - argocon-1
       - argocon-2
       - argocon-3
+    - name: using-autoscaler
+      value: "false"
+      enum:
+      - "true"
+      - "false"
   templates:
   - name: rollback
     inputs:
@@ -84,6 +89,9 @@ spec:
             value: "{{inputs.parameters.nodegroup_name}}"
           - name: cluster
             value: "{{inputs.parameters.cluster}}"
+    - - name: up-autoscaler
+        template: up-autoscaler
+        when: "{{workflow.parameters.using-autoscaler}} == true"
     - - name: delete-karpenter
         template: delete-karpenter
         arguments:
@@ -133,9 +141,16 @@ spec:
                 'maxSize': max_size
             }
         )
+
+  - name: up-autoscaler
+    script:
+      image: csantanapr/python-argocon:1.6
+      command: [python]
+      source: |
+        import sys
+        from sharedlib import infra
         print("Scaling up autoscaler ", file=sys.stderr)
-        # TODO make autoscaler conditional
-        # infra.scale_deployment("aws-cluster-autoscaler", "kube-system", 1)
+        infra.scale_deployment("aws-cluster-autoscaler", "kube-system", 1)
 
   - name: delete-karpenter
     inputs:
