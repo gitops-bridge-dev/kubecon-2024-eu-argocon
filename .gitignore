@@ -45,3 +45,5 @@ go.sum
 .DS_Store
 
 **/.env
+
+terraform-s3-state.tf
