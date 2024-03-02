@@ -132,3 +132,8 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true  # Big CRDs.
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+          - /spec/replicas
