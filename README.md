@@ -47,14 +47,14 @@ Terminal: List Node Group nodes
 New shell
 ```shell
 export KUBECONFIG="/tmp/argocon-1"
-eks-node-viewer --kubeconfig /tmp/argocon-1 --nodeSelector eks.amazonaws.com/nodegroup  -disable-pricing
+eks-node-viewer --kubeconfig /tmp/argocon-1 -node-selector eks.amazonaws.com/nodegroup  -disable-pricing
 ```
 
 Terminal: List Karpenter nodes
 New shell
 ```shell
 export KUBECONFIG="/tmp/argocon-1"
-eks-node-viewer -kubeconfig /tmp/argocon-1 -nodeSelector karpenter.sh/nodepool -disable-pricing
+eks-node-viewer -kubeconfig /tmp/argocon-1 -node-selector karpenter.sh/nodepool -disable-pricing
 ```
 
 # Delete Demo
