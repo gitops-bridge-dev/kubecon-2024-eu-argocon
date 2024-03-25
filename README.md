@@ -4,7 +4,8 @@ Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://g
 
 Slides: [Migrate-to-Karpenter-Argo-Workflows.pdf](./Migrate-to-Karpenter-Argo-Workflows.pdf)
 
-Watch the video on youtube:[![Watch the video](https://img.youtube.com/vi/rq57liGu0H4/maxresdefault.jpg)](https://youtu.be/rq57liGu0H4)
+Watch the video on youtube: https://youtu.be/rq57liGu0H4
+[![Watch the video](https://img.youtube.com/vi/rq57liGu0H4/maxresdefault.jpg)](https://youtu.be/rq57liGu0H4)
 
 
 # Run the Demo
