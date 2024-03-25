@@ -1,9 +1,10 @@
 # Live Migration from Node-AutocScaler to Karpenter with Argo-Workflows
 Using Argo Workflows for live migration from [CNCF Cluster AutoScaler](https://github.com/kubernetes/autoscaler) to [CNCF Karpenter](https://github.com/kubernetes-sigs/karpenter)
 
-Checkout the talk in youtube!
-[![Watch the video](https://img.youtube.com/vi/rq57liGu0H4/maxresdefault.jpg)](https://youtu.be/rq57liGu0H4)
 
+Slides: [Migrate-to-Karpenter-Argo-Workflows.pdf](./Migrate-to-Karpenter-Argo-Workflows.pdf)
+
+Watch the video on youtube:[![Watch the video](https://img.youtube.com/vi/rq57liGu0H4/maxresdefault.jpg)](https://youtu.be/rq57liGu0H4)
 
 
 # Run the Demo
